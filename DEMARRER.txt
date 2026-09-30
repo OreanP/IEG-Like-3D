@@ -1,0 +1,24 @@
+IEG LIKE GODOT — VERSION GDSCRIPT
+
+1. Extraire ce dossier séparément de l'ancien projet C#.
+2. Ouvrir Godot standard 4.5+ (branche 4.x).
+3. Importer le project.godot de CE dossier.
+4. Laisser Godot importer les modèles 3D.
+5. F5 pour lancer l'entraînement.
+
+Aucun SDK .NET, aucune commande de compilation C#, aucune extension à installer.
+Le moteur Godot n'est pas inclus.
+
+Déplacement : stick gauche ou ZQSD/WASD.
+Passe : A/Croix/Espace.
+Tir : X/Carré/clic gauche/F, maintenir puis relâcher.
+Caméra : stick droit ou clic droit maintenu + souris.
+Sprint : RT/R2/Maj. Joueur suivant : LB/L1/Tab.
+R : replacer. C : recentrer. Échap/Start/Options : pause.
+
+Les contrôles détaillés et la liste des fonctions sont dans README.md.
+Les limites de validation sont dans docs/VALIDATION.md : vérifications de syntaxe
+et de structure réalisées, mais Godot n'a pas été exécuté dans l'environnement
+ayant préparé l'archive. Les 30 tests GDScript sont fournis, pas certifiés exécutés.
+
+Tests facultatifs : ouvrir tests/test_runner.tscn puis F6.

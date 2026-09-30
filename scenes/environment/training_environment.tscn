@@ -1,0 +1,911 @@
+[gd_scene load_steps=19 format=3]
+
+[ext_resource type="Shader" path="res://assets/environment/pitch.gdshader" id="1_grass"]
+[ext_resource type="Script" path="res://scripts/presentation/line_segments.gd" id="2_wires"]
+
+[sub_resource type="StandardMaterial3D" id="r_1"]
+albedo_color = Color(0.745098, 0.776471, 0.737255, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="r_2"]
+albedo_color = Color(0.141176, 0.211765, 0.254902, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="r_3"]
+albedo_color = Color(0.392157, 0.466667, 0.490196, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="r_4"]
+albedo_color = Color(0.964706, 0.952941, 0.866667, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="r_5"]
+albedo_color = Color(0.333333, 0.407843, 0.470588, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="r_6"]
+albedo_color = Color(0.737255, 0.564706, 0.400000, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="r_7"]
+albedo_color = Color(0.078431, 0.349020, 0.564706, 1)
+roughness = 0.9
+
+[sub_resource type="BoxMesh" id="r_8"]
+size = Vector3(1, 1, 1)
+
+[sub_resource type="CylinderMesh" id="r_9"]
+top_radius = 1.0
+bottom_radius = 1.0
+height = 1.0
+radial_segments = 10
+rings = 1
+
+[sub_resource type="ShaderMaterial" id="r_10"]
+shader = ExtResource("1_grass")
+
+[sub_resource type="PlaneMesh" id="r_11"]
+size = Vector2(24, 36)
+
+[sub_resource type="TorusMesh" id="r_12"]
+inner_radius = 3
+outer_radius = 3.08
+rings = 64
+ring_segments = 8
+
+[sub_resource type="CylinderMesh" id="r_13"]
+top_radius = 0.085
+bottom_radius = 0.085
+height = 0.02
+radial_segments = 16
+
+[sub_resource type="ProceduralSkyMaterial" id="r_14"]
+sky_top_color = Color(0.458824, 0.611765, 0.678431, 1)
+sky_horizon_color = Color(0.850980, 0.886275, 0.835294, 1)
+ground_bottom_color = Color(0.431373, 0.517647, 0.478431, 1)
+ground_horizon_color = Color(0.850980, 0.886275, 0.835294, 1)
+
+[sub_resource type="Sky" id="r_15"]
+sky_material = SubResource("r_14")
+
+[sub_resource type="Environment" id="r_16"]
+background_mode = 2
+sky = SubResource("r_15")
+ambient_light_source = 2
+ambient_light_color = Color(0.764706, 0.850980, 0.882353, 1)
+ambient_light_energy = 0.65
+tonemap_mode = 2
+
+[node name="TrainingEnvironment" type="Node3D"]
+
+[node name="Plaza" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.43, 0)
+mesh = SubResource("r_8")
+material_override = SubResource("r_1")
+scale = Vector3(64, 0.8, 64)
+
+[node name="PitchBorder" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.12, 0)
+mesh = SubResource("r_8")
+material_override = SubResource("r_5")
+scale = Vector3(28, 0.2, 40)
+
+[node name="Pitch" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0, 0)
+mesh = SubResource("r_11")
+material_override = SubResource("r_10")
+
+[node name="FieldLine_1" type="MeshInstance3D" parent="."]
+position = Vector3(-12, 0.014, 0)
+mesh = SubResource("r_8")
+material_override = SubResource("r_4")
+scale = Vector3(0.09, 0.018, 36)
+
+[node name="FieldLine_2" type="MeshInstance3D" parent="."]
+position = Vector3(12, 0.014, 0)
+mesh = SubResource("r_8")
+material_override = SubResource("r_4")
+scale = Vector3(0.09, 0.018, 36)
+
+[node name="FieldLine_3" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.014, -18)
+mesh = SubResource("r_8")
+material_override = SubResource("r_4")
+scale = Vector3(24, 0.018, 0.09)
+
+[node name="FieldLine_4" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.014, 18)
+mesh = SubResource("r_8")
+material_override = SubResource("r_4")
+scale = Vector3(24, 0.018, 0.09)
+
+[node name="FieldLine_5" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.014, 0)
+mesh = SubResource("r_8")
+material_override = SubResource("r_4")
+scale = Vector3(24, 0.018, 0.08)
+
+[node name="CenterCircle" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.023, 0)
+mesh = SubResource("r_12")
+material_override = SubResource("r_4")
+scale = Vector3(1, 0.16, 1)
+
+[node name="CenterSpot" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.016, 0)
+mesh = SubResource("r_13")
+material_override = SubResource("r_4")
+
+[node name="FieldLine_6" type="MeshInstance3D" parent="."]
+position = Vector3(-5, 0.014, -15.5)
+mesh = SubResource("r_8")
+material_override = SubResource("r_4")
+scale = Vector3(0.08, 0.018, 5)
+
+[node name="FieldLine_7" type="MeshInstance3D" parent="."]
+position = Vector3(5, 0.014, -15.5)
+mesh = SubResource("r_8")
+material_override = SubResource("r_4")
+scale = Vector3(0.08, 0.018, 5)
+
+[node name="FieldLine_8" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.014, -13)
+mesh = SubResource("r_8")
+material_override = SubResource("r_4")
+scale = Vector3(10, 0.018, 0.08)
+
+[node name="FieldLine_9" type="MeshInstance3D" parent="."]
+position = Vector3(-3.8, 0.014, -17)
+mesh = SubResource("r_8")
+material_override = SubResource("r_4")
+scale = Vector3(0.07, 0.018, 2)
+
+[node name="FieldLine_10" type="MeshInstance3D" parent="."]
+position = Vector3(3.8, 0.014, -17)
+mesh = SubResource("r_8")
+material_override = SubResource("r_4")
+scale = Vector3(0.07, 0.018, 2)
+
+[node name="FieldLine_11" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.014, -16)
+mesh = SubResource("r_8")
+material_override = SubResource("r_4")
+scale = Vector3(7.6, 0.018, 0.07)
+
+[node name="PenaltySpotNorth" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.016, -12)
+mesh = SubResource("r_13")
+material_override = SubResource("r_4")
+
+[node name="NorthLeftPost" type="MeshInstance3D" parent="."]
+position = Vector3(-3, 1.2, -18)
+mesh = SubResource("r_9")
+material_override = SubResource("r_4")
+scale = Vector3(0.055, 2.4, 0.055)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="NorthLeftUpperSupport" type="MeshInstance3D" parent="."]
+position = Vector3(-3, 2.2, -18.75)
+mesh = SubResource("r_9")
+material_override = SubResource("r_4")
+scale = Vector3(0.035, 1.552417, 0.035)
+quaternion = Quaternion(-0.7929889, 0, -0, 0.6092361)
+
+[node name="NorthLeftBackSupport" type="MeshInstance3D" parent="."]
+position = Vector3(-3, 1, -19.5)
+mesh = SubResource("r_9")
+material_override = SubResource("r_4")
+scale = Vector3(0.035, 2, 0.035)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="NorthLeftGroundSupport" type="MeshInstance3D" parent="."]
+position = Vector3(-3, 0.04, -18.75)
+mesh = SubResource("r_9")
+material_override = SubResource("r_4")
+scale = Vector3(0.035, 1.5, 0.035)
+quaternion = Quaternion(-0.7071068, 0, -0, 0.7071068)
+
+[node name="NorthRightPost" type="MeshInstance3D" parent="."]
+position = Vector3(3, 1.2, -18)
+mesh = SubResource("r_9")
+material_override = SubResource("r_4")
+scale = Vector3(0.055, 2.4, 0.055)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="NorthRightUpperSupport" type="MeshInstance3D" parent="."]
+position = Vector3(3, 2.2, -18.75)
+mesh = SubResource("r_9")
+material_override = SubResource("r_4")
+scale = Vector3(0.035, 1.552417, 0.035)
+quaternion = Quaternion(-0.7929889, 0, -0, 0.6092361)
+
+[node name="NorthRightBackSupport" type="MeshInstance3D" parent="."]
+position = Vector3(3, 1, -19.5)
+mesh = SubResource("r_9")
+material_override = SubResource("r_4")
+scale = Vector3(0.035, 2, 0.035)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="NorthRightGroundSupport" type="MeshInstance3D" parent="."]
+position = Vector3(3, 0.04, -18.75)
+mesh = SubResource("r_9")
+material_override = SubResource("r_4")
+scale = Vector3(0.035, 1.5, 0.035)
+quaternion = Quaternion(-0.7071068, 0, -0, 0.7071068)
+
+[node name="NorthCrossbar" type="MeshInstance3D" parent="."]
+position = Vector3(0, 2.4, -18)
+mesh = SubResource("r_9")
+material_override = SubResource("r_4")
+scale = Vector3(0.055, 6, 0.055)
+quaternion = Quaternion(0, 0, -0.7071068, 0.7071068)
+
+[node name="FencePost_North_0" type="MeshInstance3D" parent="."]
+position = Vector3(-14, 1.05, -21)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.038, 2.1, 0.038)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FencePost_North_3" type="MeshInstance3D" parent="."]
+position = Vector3(-14, 1.05, -18)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.038, 2.1, 0.038)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FencePost_North_6" type="MeshInstance3D" parent="."]
+position = Vector3(-14, 1.05, -15)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.038, 2.1, 0.038)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FencePost_North_9" type="MeshInstance3D" parent="."]
+position = Vector3(-14, 1.05, -12)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.038, 2.1, 0.038)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FencePost_North_12" type="MeshInstance3D" parent="."]
+position = Vector3(-14, 1.05, -9)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.038, 2.1, 0.038)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FencePost_North_15" type="MeshInstance3D" parent="."]
+position = Vector3(-14, 1.05, -6)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.038, 2.1, 0.038)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FencePost_North_18" type="MeshInstance3D" parent="."]
+position = Vector3(-14, 1.05, -3)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.038, 2.1, 0.038)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FencePost_North_21" type="MeshInstance3D" parent="."]
+position = Vector3(-14, 1.05, 0)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.038, 2.1, 0.038)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FencePost_North_24" type="MeshInstance3D" parent="."]
+position = Vector3(-14, 1.05, 3)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.038, 2.1, 0.038)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FencePost_North_27" type="MeshInstance3D" parent="."]
+position = Vector3(-14, 1.05, 6)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.038, 2.1, 0.038)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FencePost_North_30" type="MeshInstance3D" parent="."]
+position = Vector3(-14, 1.05, 9)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.038, 2.1, 0.038)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FencePost_North_33" type="MeshInstance3D" parent="."]
+position = Vector3(-14, 1.05, 12)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.038, 2.1, 0.038)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FencePost_North_36" type="MeshInstance3D" parent="."]
+position = Vector3(-14, 1.05, 15)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.038, 2.1, 0.038)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FencePost_North_39" type="MeshInstance3D" parent="."]
+position = Vector3(-14, 1.05, 18)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.038, 2.1, 0.038)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FencePost_North_42" type="MeshInstance3D" parent="."]
+position = Vector3(-14, 1.05, 21)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.038, 2.1, 0.038)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FenceRailNorth" type="MeshInstance3D" parent="."]
+position = Vector3(-14, 2.1, 0)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.033, 42, 0.033)
+quaternion = Quaternion(0.7071068, 0, -0, 0.7071068)
+
+[node name="FenceEndPost_North_0" type="MeshInstance3D" parent="."]
+position = Vector3(-14, 1.05, -21)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.035, 2.1, 0.035)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FenceEndPost_North_4" type="MeshInstance3D" parent="."]
+position = Vector3(-10, 1.05, -21)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.035, 2.1, 0.035)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FenceEndPost_North_8" type="MeshInstance3D" parent="."]
+position = Vector3(-6, 1.05, -21)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.035, 2.1, 0.035)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FenceEndPost_North_12" type="MeshInstance3D" parent="."]
+position = Vector3(-2, 1.05, -21)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.035, 2.1, 0.035)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FenceEndPost_North_16" type="MeshInstance3D" parent="."]
+position = Vector3(2, 1.05, -21)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.035, 2.1, 0.035)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FenceEndPost_North_20" type="MeshInstance3D" parent="."]
+position = Vector3(6, 1.05, -21)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.035, 2.1, 0.035)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FenceEndPost_North_24" type="MeshInstance3D" parent="."]
+position = Vector3(10, 1.05, -21)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.035, 2.1, 0.035)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FenceEndPost_North_28" type="MeshInstance3D" parent="."]
+position = Vector3(14, 1.05, -21)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.035, 2.1, 0.035)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FenceEndRailNorth" type="MeshInstance3D" parent="."]
+position = Vector3(0, 2.1, -21)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.033, 28, 0.033)
+quaternion = Quaternion(0, 0, -0.7071068, 0.7071068)
+
+[node name="Stand_North_0" type="MeshInstance3D" parent="."]
+position = Vector3(-16, 0, 0)
+mesh = SubResource("r_8")
+material_override = SubResource("r_1")
+scale = Vector3(0.85, 0.5, 11)
+
+[node name="Seat_North_0" type="MeshInstance3D" parent="."]
+position = Vector3(-16, 0.43, 0)
+mesh = SubResource("r_8")
+material_override = SubResource("r_6")
+scale = Vector3(0.55, 0.1, 10.5)
+
+[node name="Stand_North_1" type="MeshInstance3D" parent="."]
+position = Vector3(-16.9, 0.28, 0)
+mesh = SubResource("r_8")
+material_override = SubResource("r_1")
+scale = Vector3(0.85, 1.05, 11)
+
+[node name="Seat_North_1" type="MeshInstance3D" parent="."]
+position = Vector3(-16.9, 0.98, 0)
+mesh = SubResource("r_8")
+material_override = SubResource("r_6")
+scale = Vector3(0.55, 0.1, 10.5)
+
+[node name="Stand_North_2" type="MeshInstance3D" parent="."]
+position = Vector3(-17.8, 0.56, 0)
+mesh = SubResource("r_8")
+material_override = SubResource("r_1")
+scale = Vector3(0.85, 1.6, 11)
+
+[node name="Seat_North_2" type="MeshInstance3D" parent="."]
+position = Vector3(-17.8, 1.53, 0)
+mesh = SubResource("r_8")
+material_override = SubResource("r_6")
+scale = Vector3(0.55, 0.1, 10.5)
+
+[node name="CanopyNorth" type="MeshInstance3D" parent="."]
+position = Vector3(-17, 3.6, 0)
+mesh = SubResource("r_8")
+material_override = SubResource("r_7")
+scale = Vector3(4, 0.13, 12)
+
+[node name="CanopySupportNorth0" type="MeshInstance3D" parent="."]
+position = Vector3(-18.4, 1.8, -5.5)
+mesh = SubResource("r_9")
+material_override = SubResource("r_3")
+scale = Vector3(0.065, 3.6, 0.065)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="CanopySupportNorth1" type="MeshInstance3D" parent="."]
+position = Vector3(-18.4, 1.8, 5.5)
+mesh = SubResource("r_9")
+material_override = SubResource("r_3")
+scale = Vector3(0.065, 3.6, 0.065)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FloodlightMastNorth0" type="MeshInstance3D" parent="."]
+position = Vector3(-17, 3.5, -17)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.075, 7, 0.075)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FloodlightNorth0" type="MeshInstance3D" parent="."]
+position = Vector3(-17, 7, -17)
+mesh = SubResource("r_8")
+material_override = SubResource("r_3")
+scale = Vector3(2, 0.18, 0.65)
+
+[node name="FloodlightLensNorth0" type="MeshInstance3D" parent="."]
+position = Vector3(-17, 6.87, -17)
+mesh = SubResource("r_8")
+material_override = SubResource("r_4")
+scale = Vector3(1.8, 0.05, 0.5)
+
+[node name="FloodlightMastNorth1" type="MeshInstance3D" parent="."]
+position = Vector3(-17, 3.5, 17)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.075, 7, 0.075)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FloodlightNorth1" type="MeshInstance3D" parent="."]
+position = Vector3(-17, 7, 17)
+mesh = SubResource("r_8")
+material_override = SubResource("r_3")
+scale = Vector3(2, 0.18, 0.65)
+
+[node name="FloodlightLensNorth1" type="MeshInstance3D" parent="."]
+position = Vector3(-17, 6.87, 17)
+mesh = SubResource("r_8")
+material_override = SubResource("r_4")
+scale = Vector3(1.8, 0.05, 0.5)
+
+[node name="FieldLine_12" type="MeshInstance3D" parent="."]
+position = Vector3(-5, 0.014, 15.5)
+mesh = SubResource("r_8")
+material_override = SubResource("r_4")
+scale = Vector3(0.08, 0.018, 5)
+
+[node name="FieldLine_13" type="MeshInstance3D" parent="."]
+position = Vector3(5, 0.014, 15.5)
+mesh = SubResource("r_8")
+material_override = SubResource("r_4")
+scale = Vector3(0.08, 0.018, 5)
+
+[node name="FieldLine_14" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.014, 13)
+mesh = SubResource("r_8")
+material_override = SubResource("r_4")
+scale = Vector3(10, 0.018, 0.08)
+
+[node name="FieldLine_15" type="MeshInstance3D" parent="."]
+position = Vector3(-3.8, 0.014, 17)
+mesh = SubResource("r_8")
+material_override = SubResource("r_4")
+scale = Vector3(0.07, 0.018, 2)
+
+[node name="FieldLine_16" type="MeshInstance3D" parent="."]
+position = Vector3(3.8, 0.014, 17)
+mesh = SubResource("r_8")
+material_override = SubResource("r_4")
+scale = Vector3(0.07, 0.018, 2)
+
+[node name="FieldLine_17" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.014, 16)
+mesh = SubResource("r_8")
+material_override = SubResource("r_4")
+scale = Vector3(7.6, 0.018, 0.07)
+
+[node name="PenaltySpotSouth" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.016, 12)
+mesh = SubResource("r_13")
+material_override = SubResource("r_4")
+
+[node name="SouthLeftPost" type="MeshInstance3D" parent="."]
+position = Vector3(-3, 1.2, 18)
+mesh = SubResource("r_9")
+material_override = SubResource("r_4")
+scale = Vector3(0.055, 2.4, 0.055)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="SouthLeftUpperSupport" type="MeshInstance3D" parent="."]
+position = Vector3(-3, 2.2, 18.75)
+mesh = SubResource("r_9")
+material_override = SubResource("r_4")
+scale = Vector3(0.035, 1.552417, 0.035)
+quaternion = Quaternion(0.7929889, 0, -0, 0.6092361)
+
+[node name="SouthLeftBackSupport" type="MeshInstance3D" parent="."]
+position = Vector3(-3, 1, 19.5)
+mesh = SubResource("r_9")
+material_override = SubResource("r_4")
+scale = Vector3(0.035, 2, 0.035)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="SouthLeftGroundSupport" type="MeshInstance3D" parent="."]
+position = Vector3(-3, 0.04, 18.75)
+mesh = SubResource("r_9")
+material_override = SubResource("r_4")
+scale = Vector3(0.035, 1.5, 0.035)
+quaternion = Quaternion(0.7071068, 0, -0, 0.7071068)
+
+[node name="SouthRightPost" type="MeshInstance3D" parent="."]
+position = Vector3(3, 1.2, 18)
+mesh = SubResource("r_9")
+material_override = SubResource("r_4")
+scale = Vector3(0.055, 2.4, 0.055)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="SouthRightUpperSupport" type="MeshInstance3D" parent="."]
+position = Vector3(3, 2.2, 18.75)
+mesh = SubResource("r_9")
+material_override = SubResource("r_4")
+scale = Vector3(0.035, 1.552417, 0.035)
+quaternion = Quaternion(0.7929889, 0, -0, 0.6092361)
+
+[node name="SouthRightBackSupport" type="MeshInstance3D" parent="."]
+position = Vector3(3, 1, 19.5)
+mesh = SubResource("r_9")
+material_override = SubResource("r_4")
+scale = Vector3(0.035, 2, 0.035)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="SouthRightGroundSupport" type="MeshInstance3D" parent="."]
+position = Vector3(3, 0.04, 18.75)
+mesh = SubResource("r_9")
+material_override = SubResource("r_4")
+scale = Vector3(0.035, 1.5, 0.035)
+quaternion = Quaternion(0.7071068, 0, -0, 0.7071068)
+
+[node name="SouthCrossbar" type="MeshInstance3D" parent="."]
+position = Vector3(0, 2.4, 18)
+mesh = SubResource("r_9")
+material_override = SubResource("r_4")
+scale = Vector3(0.055, 6, 0.055)
+quaternion = Quaternion(0, 0, -0.7071068, 0.7071068)
+
+[node name="FencePost_South_0" type="MeshInstance3D" parent="."]
+position = Vector3(14, 1.05, -21)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.038, 2.1, 0.038)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FencePost_South_3" type="MeshInstance3D" parent="."]
+position = Vector3(14, 1.05, -18)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.038, 2.1, 0.038)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FencePost_South_6" type="MeshInstance3D" parent="."]
+position = Vector3(14, 1.05, -15)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.038, 2.1, 0.038)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FencePost_South_9" type="MeshInstance3D" parent="."]
+position = Vector3(14, 1.05, -12)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.038, 2.1, 0.038)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FencePost_South_12" type="MeshInstance3D" parent="."]
+position = Vector3(14, 1.05, -9)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.038, 2.1, 0.038)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FencePost_South_15" type="MeshInstance3D" parent="."]
+position = Vector3(14, 1.05, -6)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.038, 2.1, 0.038)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FencePost_South_18" type="MeshInstance3D" parent="."]
+position = Vector3(14, 1.05, -3)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.038, 2.1, 0.038)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FencePost_South_21" type="MeshInstance3D" parent="."]
+position = Vector3(14, 1.05, 0)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.038, 2.1, 0.038)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FencePost_South_24" type="MeshInstance3D" parent="."]
+position = Vector3(14, 1.05, 3)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.038, 2.1, 0.038)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FencePost_South_27" type="MeshInstance3D" parent="."]
+position = Vector3(14, 1.05, 6)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.038, 2.1, 0.038)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FencePost_South_30" type="MeshInstance3D" parent="."]
+position = Vector3(14, 1.05, 9)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.038, 2.1, 0.038)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FencePost_South_33" type="MeshInstance3D" parent="."]
+position = Vector3(14, 1.05, 12)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.038, 2.1, 0.038)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FencePost_South_36" type="MeshInstance3D" parent="."]
+position = Vector3(14, 1.05, 15)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.038, 2.1, 0.038)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FencePost_South_39" type="MeshInstance3D" parent="."]
+position = Vector3(14, 1.05, 18)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.038, 2.1, 0.038)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FencePost_South_42" type="MeshInstance3D" parent="."]
+position = Vector3(14, 1.05, 21)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.038, 2.1, 0.038)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FenceRailSouth" type="MeshInstance3D" parent="."]
+position = Vector3(14, 2.1, 0)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.033, 42, 0.033)
+quaternion = Quaternion(0.7071068, 0, -0, 0.7071068)
+
+[node name="FenceEndPost_South_0" type="MeshInstance3D" parent="."]
+position = Vector3(-14, 1.05, 21)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.035, 2.1, 0.035)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FenceEndPost_South_4" type="MeshInstance3D" parent="."]
+position = Vector3(-10, 1.05, 21)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.035, 2.1, 0.035)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FenceEndPost_South_8" type="MeshInstance3D" parent="."]
+position = Vector3(-6, 1.05, 21)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.035, 2.1, 0.035)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FenceEndPost_South_12" type="MeshInstance3D" parent="."]
+position = Vector3(-2, 1.05, 21)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.035, 2.1, 0.035)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FenceEndPost_South_16" type="MeshInstance3D" parent="."]
+position = Vector3(2, 1.05, 21)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.035, 2.1, 0.035)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FenceEndPost_South_20" type="MeshInstance3D" parent="."]
+position = Vector3(6, 1.05, 21)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.035, 2.1, 0.035)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FenceEndPost_South_24" type="MeshInstance3D" parent="."]
+position = Vector3(10, 1.05, 21)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.035, 2.1, 0.035)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FenceEndPost_South_28" type="MeshInstance3D" parent="."]
+position = Vector3(14, 1.05, 21)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.035, 2.1, 0.035)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FenceEndRailSouth" type="MeshInstance3D" parent="."]
+position = Vector3(0, 2.1, 21)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.033, 28, 0.033)
+quaternion = Quaternion(0, 0, -0.7071068, 0.7071068)
+
+[node name="Stand_South_0" type="MeshInstance3D" parent="."]
+position = Vector3(16, 0, 0)
+mesh = SubResource("r_8")
+material_override = SubResource("r_1")
+scale = Vector3(0.85, 0.5, 11)
+
+[node name="Seat_South_0" type="MeshInstance3D" parent="."]
+position = Vector3(16, 0.43, 0)
+mesh = SubResource("r_8")
+material_override = SubResource("r_6")
+scale = Vector3(0.55, 0.1, 10.5)
+
+[node name="Stand_South_1" type="MeshInstance3D" parent="."]
+position = Vector3(16.9, 0.28, 0)
+mesh = SubResource("r_8")
+material_override = SubResource("r_1")
+scale = Vector3(0.85, 1.05, 11)
+
+[node name="Seat_South_1" type="MeshInstance3D" parent="."]
+position = Vector3(16.9, 0.98, 0)
+mesh = SubResource("r_8")
+material_override = SubResource("r_6")
+scale = Vector3(0.55, 0.1, 10.5)
+
+[node name="Stand_South_2" type="MeshInstance3D" parent="."]
+position = Vector3(17.8, 0.56, 0)
+mesh = SubResource("r_8")
+material_override = SubResource("r_1")
+scale = Vector3(0.85, 1.6, 11)
+
+[node name="Seat_South_2" type="MeshInstance3D" parent="."]
+position = Vector3(17.8, 1.53, 0)
+mesh = SubResource("r_8")
+material_override = SubResource("r_6")
+scale = Vector3(0.55, 0.1, 10.5)
+
+[node name="CanopySouth" type="MeshInstance3D" parent="."]
+position = Vector3(17, 3.6, 0)
+mesh = SubResource("r_8")
+material_override = SubResource("r_7")
+scale = Vector3(4, 0.13, 12)
+
+[node name="CanopySupportSouth0" type="MeshInstance3D" parent="."]
+position = Vector3(18.4, 1.8, -5.5)
+mesh = SubResource("r_9")
+material_override = SubResource("r_3")
+scale = Vector3(0.065, 3.6, 0.065)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="CanopySupportSouth1" type="MeshInstance3D" parent="."]
+position = Vector3(18.4, 1.8, 5.5)
+mesh = SubResource("r_9")
+material_override = SubResource("r_3")
+scale = Vector3(0.065, 3.6, 0.065)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FloodlightMastSouth0" type="MeshInstance3D" parent="."]
+position = Vector3(17, 3.5, -17)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.075, 7, 0.075)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FloodlightSouth0" type="MeshInstance3D" parent="."]
+position = Vector3(17, 7, -17)
+mesh = SubResource("r_8")
+material_override = SubResource("r_3")
+scale = Vector3(2, 0.18, 0.65)
+
+[node name="FloodlightLensSouth0" type="MeshInstance3D" parent="."]
+position = Vector3(17, 6.87, -17)
+mesh = SubResource("r_8")
+material_override = SubResource("r_4")
+scale = Vector3(1.8, 0.05, 0.5)
+
+[node name="FloodlightMastSouth1" type="MeshInstance3D" parent="."]
+position = Vector3(17, 3.5, 17)
+mesh = SubResource("r_9")
+material_override = SubResource("r_2")
+scale = Vector3(0.075, 7, 0.075)
+quaternion = Quaternion(0, 0, -0, 1)
+
+[node name="FloodlightSouth1" type="MeshInstance3D" parent="."]
+position = Vector3(17, 7, 17)
+mesh = SubResource("r_8")
+material_override = SubResource("r_3")
+scale = Vector3(2, 0.18, 0.65)
+
+[node name="FloodlightLensSouth1" type="MeshInstance3D" parent="."]
+position = Vector3(17, 6.87, 17)
+mesh = SubResource("r_8")
+material_override = SubResource("r_4")
+scale = Vector3(1.8, 0.05, 0.5)
+
+[node name="Netting" type="Node3D" parent="."]
+script = ExtResource("2_wires")
+points = PackedVector3Array(-3, 0, -19.5, -3, 2, -19.5, -3, 2.4, -18, -3, 2, -19.5, -2.7, 0, -19.5, -2.7, 2, -19.5, -2.7, 2.4, -18, -2.7, 2, -19.5, -2.4, 0, -19.5, -2.4, 2, -19.5, -2.4, 2.4, -18, -2.4, 2, -19.5, -2.1, 0, -19.5, -2.1, 2, -19.5, -2.1, 2.4, -18, -2.1, 2, -19.5, -1.8, 0, -19.5, -1.8, 2, -19.5, -1.8, 2.4, -18, -1.8, 2, -19.5, -1.5, 0, -19.5, -1.5, 2, -19.5, -1.5, 2.4, -18, -1.5, 2, -19.5, -1.2, 0, -19.5, -1.2, 2, -19.5, -1.2, 2.4, -18, -1.2, 2, -19.5, -0.9, 0, -19.5, -0.9, 2, -19.5, -0.9, 2.4, -18, -0.9, 2, -19.5, -0.6, 0, -19.5, -0.6, 2, -19.5, -0.6, 2.4, -18, -0.6, 2, -19.5, -0.3, 0, -19.5, -0.3, 2, -19.5, -0.3, 2.4, -18, -0.3, 2, -19.5, 0, 0, -19.5, 0, 2, -19.5, 0, 2.4, -18, 0, 2, -19.5, 0.3, 0, -19.5, 0.3, 2, -19.5, 0.3, 2.4, -18, 0.3, 2, -19.5, 0.6, 0, -19.5, 0.6, 2, -19.5, 0.6, 2.4, -18, 0.6, 2, -19.5, 0.9, 0, -19.5, 0.9, 2, -19.5, 0.9, 2.4, -18, 0.9, 2, -19.5, 1.2, 0, -19.5, 1.2, 2, -19.5, 1.2, 2.4, -18, 1.2, 2, -19.5, 1.5, 0, -19.5, 1.5, 2, -19.5, 1.5, 2.4, -18, 1.5, 2, -19.5, 1.8, 0, -19.5, 1.8, 2, -19.5, 1.8, 2.4, -18, 1.8, 2, -19.5, 2.1, 0, -19.5, 2.1, 2, -19.5, 2.1, 2.4, -18, 2.1, 2, -19.5, 2.4, 0, -19.5, 2.4, 2, -19.5, 2.4, 2.4, -18, 2.4, 2, -19.5, 2.7, 0, -19.5, 2.7, 2, -19.5, 2.7, 2.4, -18, 2.7, 2, -19.5, 3, 0, -19.5, 3, 2, -19.5, 3, 2.4, -18, 3, 2, -19.5, -3, 0.2, -19.5, 3, 0.2, -19.5, -3, 0.2, -18, -3, 0.2, -19.5, 3, 0.2, -18, 3, 0.2, -19.5, -3, 0.4, -19.5, 3, 0.4, -19.5, -3, 0.4, -18, -3, 0.4, -19.5, 3, 0.4, -18, 3, 0.4, -19.5, -3, 0.6, -19.5, 3, 0.6, -19.5, -3, 0.6, -18, -3, 0.6, -19.5, 3, 0.6, -18, 3, 0.6, -19.5, -3, 0.8, -19.5, 3, 0.8, -19.5, -3, 0.8, -18, -3, 0.8, -19.5, 3, 0.8, -18, 3, 0.8, -19.5, -3, 1, -19.5, 3, 1, -19.5, -3, 1, -18, -3, 1, -19.5, 3, 1, -18, 3, 1, -19.5, -3, 1.2, -19.5, 3, 1.2, -19.5, -3, 1.2, -18, -3, 1.2, -19.5, 3, 1.2, -18, 3, 1.2, -19.5, -3, 1.4, -19.5, 3, 1.4, -19.5, -3, 1.4, -18, -3, 1.4, -19.5, 3, 1.4, -18, 3, 1.4, -19.5, -3, 1.6, -19.5, 3, 1.6, -19.5, -3, 1.6, -18, -3, 1.6, -19.5, 3, 1.6, -18, 3, 1.6, -19.5, -3, 1.8, -19.5, 3, 1.8, -19.5, -3, 1.8, -18, -3, 1.8, -19.5, 3, 1.8, -18, 3, 1.8, -19.5, -3, 2, -19.5, 3, 2, -19.5, -3, 2, -18, -3, 2, -19.5, 3, 2, -18, 3, 2, -19.5, -3, 0, -18.25, -3, 2.333333, -18.25, 3, 0, -18.25, 3, 2.333333, -18.25, -3, 0, -18.5, -3, 2.266667, -18.5, 3, 0, -18.5, 3, 2.266667, -18.5, -3, 0, -18.75, -3, 2.2, -18.75, 3, 0, -18.75, 3, 2.2, -18.75, -3, 0, -19, -3, 2.133333, -19, 3, 0, -19, 3, 2.133333, -19, -3, 0, -19.25, -3, 2.066667, -19.25, 3, 0, -19.25, 3, 2.066667, -19.25, -3, 0, 19.5, -3, 2, 19.5, -3, 2.4, 18, -3, 2, 19.5, -2.7, 0, 19.5, -2.7, 2, 19.5, -2.7, 2.4, 18, -2.7, 2, 19.5, -2.4, 0, 19.5, -2.4, 2, 19.5, -2.4, 2.4, 18, -2.4, 2, 19.5, -2.1, 0, 19.5, -2.1, 2, 19.5, -2.1, 2.4, 18, -2.1, 2, 19.5, -1.8, 0, 19.5, -1.8, 2, 19.5, -1.8, 2.4, 18, -1.8, 2, 19.5, -1.5, 0, 19.5, -1.5, 2, 19.5, -1.5, 2.4, 18, -1.5, 2, 19.5, -1.2, 0, 19.5, -1.2, 2, 19.5, -1.2, 2.4, 18, -1.2, 2, 19.5, -0.9, 0, 19.5, -0.9, 2, 19.5, -0.9, 2.4, 18, -0.9, 2, 19.5, -0.6, 0, 19.5, -0.6, 2, 19.5, -0.6, 2.4, 18, -0.6, 2, 19.5, -0.3, 0, 19.5, -0.3, 2, 19.5, -0.3, 2.4, 18, -0.3, 2, 19.5, 0, 0, 19.5, 0, 2, 19.5, 0, 2.4, 18, 0, 2, 19.5, 0.3, 0, 19.5, 0.3, 2, 19.5, 0.3, 2.4, 18, 0.3, 2, 19.5, 0.6, 0, 19.5, 0.6, 2, 19.5, 0.6, 2.4, 18, 0.6, 2, 19.5, 0.9, 0, 19.5, 0.9, 2, 19.5, 0.9, 2.4, 18, 0.9, 2, 19.5, 1.2, 0, 19.5, 1.2, 2, 19.5, 1.2, 2.4, 18, 1.2, 2, 19.5, 1.5, 0, 19.5, 1.5, 2, 19.5, 1.5, 2.4, 18, 1.5, 2, 19.5, 1.8, 0, 19.5, 1.8, 2, 19.5, 1.8, 2.4, 18, 1.8, 2, 19.5, 2.1, 0, 19.5, 2.1, 2, 19.5, 2.1, 2.4, 18, 2.1, 2, 19.5, 2.4, 0, 19.5, 2.4, 2, 19.5, 2.4, 2.4, 18, 2.4, 2, 19.5, 2.7, 0, 19.5, 2.7, 2, 19.5, 2.7, 2.4, 18, 2.7, 2, 19.5, 3, 0, 19.5, 3, 2, 19.5, 3, 2.4, 18, 3, 2, 19.5, -3, 0.2, 19.5, 3, 0.2, 19.5, -3, 0.2, 18, -3, 0.2, 19.5, 3, 0.2, 18, 3, 0.2, 19.5, -3, 0.4, 19.5, 3, 0.4, 19.5, -3, 0.4, 18, -3, 0.4, 19.5, 3, 0.4, 18, 3, 0.4, 19.5, -3, 0.6, 19.5, 3, 0.6, 19.5, -3, 0.6, 18, -3, 0.6, 19.5, 3, 0.6, 18, 3, 0.6, 19.5, -3, 0.8, 19.5, 3, 0.8, 19.5, -3, 0.8, 18, -3, 0.8, 19.5, 3, 0.8, 18, 3, 0.8, 19.5, -3, 1, 19.5, 3, 1, 19.5, -3, 1, 18, -3, 1, 19.5, 3, 1, 18, 3, 1, 19.5, -3, 1.2, 19.5, 3, 1.2, 19.5, -3, 1.2, 18, -3, 1.2, 19.5, 3, 1.2, 18, 3, 1.2, 19.5, -3, 1.4, 19.5, 3, 1.4, 19.5, -3, 1.4, 18, -3, 1.4, 19.5, 3, 1.4, 18, 3, 1.4, 19.5, -3, 1.6, 19.5, 3, 1.6, 19.5, -3, 1.6, 18, -3, 1.6, 19.5, 3, 1.6, 18, 3, 1.6, 19.5, -3, 1.8, 19.5, 3, 1.8, 19.5, -3, 1.8, 18, -3, 1.8, 19.5, 3, 1.8, 18, 3, 1.8, 19.5, -3, 2, 19.5, 3, 2, 19.5, -3, 2, 18, -3, 2, 19.5, 3, 2, 18, 3, 2, 19.5, -3, 0, 18.25, -3, 2.333333, 18.25, 3, 0, 18.25, 3, 2.333333, 18.25, -3, 0, 18.5, -3, 2.266667, 18.5, 3, 0, 18.5, 3, 2.266667, 18.5, -3, 0, 18.75, -3, 2.2, 18.75, 3, 0, 18.75, 3, 2.2, 18.75, -3, 0, 19, -3, 2.133333, 19, 3, 0, 19, 3, 2.133333, 19, -3, 0, 19.25, -3, 2.066667, 19.25, 3, 0, 19.25, 3, 2.066667, 19.25)
+line_color = Color(0.678431, 0.737255, 0.721569, 1)
+
+[node name="FenceWires" type="Node3D" parent="."]
+script = ExtResource("2_wires")
+points = PackedVector3Array(-14, 0.3, -21, -14, 0.3, 21, -14, 0.6, -21, -14, 0.6, 21, -14, 0.9, -21, -14, 0.9, 21, -14, 1.2, -21, -14, 1.2, 21, -14, 1.5, -21, -14, 1.5, 21, -14, 1.8, -21, -14, 1.8, 21, -14, 2.1, -21, -14, 2.1, 21, -14, 0.05, -21, -14, 2.1, -21, -14, 0.05, -20.6, -14, 2.1, -20.6, -14, 0.05, -20.2, -14, 2.1, -20.2, -14, 0.05, -19.8, -14, 2.1, -19.8, -14, 0.05, -19.4, -14, 2.1, -19.4, -14, 0.05, -19, -14, 2.1, -19, -14, 0.05, -18.6, -14, 2.1, -18.6, -14, 0.05, -18.2, -14, 2.1, -18.2, -14, 0.05, -17.8, -14, 2.1, -17.8, -14, 0.05, -17.4, -14, 2.1, -17.4, -14, 0.05, -17, -14, 2.1, -17, -14, 0.05, -16.6, -14, 2.1, -16.6, -14, 0.05, -16.2, -14, 2.1, -16.2, -14, 0.05, -15.8, -14, 2.1, -15.8, -14, 0.05, -15.4, -14, 2.1, -15.4, -14, 0.05, -15, -14, 2.1, -15, -14, 0.05, -14.6, -14, 2.1, -14.6, -14, 0.05, -14.2, -14, 2.1, -14.2, -14, 0.05, -13.8, -14, 2.1, -13.8, -14, 0.05, -13.4, -14, 2.1, -13.4, -14, 0.05, -13, -14, 2.1, -13, -14, 0.05, -12.6, -14, 2.1, -12.6, -14, 0.05, -12.2, -14, 2.1, -12.2, -14, 0.05, -11.8, -14, 2.1, -11.8, -14, 0.05, -11.4, -14, 2.1, -11.4, -14, 0.05, -11, -14, 2.1, -11, -14, 0.05, -10.6, -14, 2.1, -10.6, -14, 0.05, -10.2, -14, 2.1, -10.2, -14, 0.05, -9.8, -14, 2.1, -9.8, -14, 0.05, -9.4, -14, 2.1, -9.4, -14, 0.05, -9, -14, 2.1, -9, -14, 0.05, -8.6, -14, 2.1, -8.6, -14, 0.05, -8.2, -14, 2.1, -8.2, -14, 0.05, -7.8, -14, 2.1, -7.8, -14, 0.05, -7.4, -14, 2.1, -7.4, -14, 0.05, -7, -14, 2.1, -7, -14, 0.05, -6.6, -14, 2.1, -6.6, -14, 0.05, -6.2, -14, 2.1, -6.2, -14, 0.05, -5.8, -14, 2.1, -5.8, -14, 0.05, -5.4, -14, 2.1, -5.4, -14, 0.05, -5, -14, 2.1, -5, -14, 0.05, -4.6, -14, 2.1, -4.6, -14, 0.05, -4.2, -14, 2.1, -4.2, -14, 0.05, -3.8, -14, 2.1, -3.8, -14, 0.05, -3.4, -14, 2.1, -3.4, -14, 0.05, -3, -14, 2.1, -3, -14, 0.05, -2.6, -14, 2.1, -2.6, -14, 0.05, -2.2, -14, 2.1, -2.2, -14, 0.05, -1.8, -14, 2.1, -1.8, -14, 0.05, -1.4, -14, 2.1, -1.4, -14, 0.05, -1, -14, 2.1, -1, -14, 0.05, -0.6, -14, 2.1, -0.6, -14, 0.05, -0.2, -14, 2.1, -0.2, -14, 0.05, 0.2, -14, 2.1, 0.2, -14, 0.05, 0.6, -14, 2.1, 0.6, -14, 0.05, 1, -14, 2.1, 1, -14, 0.05, 1.4, -14, 2.1, 1.4, -14, 0.05, 1.8, -14, 2.1, 1.8, -14, 0.05, 2.2, -14, 2.1, 2.2, -14, 0.05, 2.6, -14, 2.1, 2.6, -14, 0.05, 3, -14, 2.1, 3, -14, 0.05, 3.4, -14, 2.1, 3.4, -14, 0.05, 3.8, -14, 2.1, 3.8, -14, 0.05, 4.2, -14, 2.1, 4.2, -14, 0.05, 4.6, -14, 2.1, 4.6, -14, 0.05, 5, -14, 2.1, 5, -14, 0.05, 5.4, -14, 2.1, 5.4, -14, 0.05, 5.8, -14, 2.1, 5.8, -14, 0.05, 6.2, -14, 2.1, 6.2, -14, 0.05, 6.6, -14, 2.1, 6.6, -14, 0.05, 7, -14, 2.1, 7, -14, 0.05, 7.4, -14, 2.1, 7.4, -14, 0.05, 7.8, -14, 2.1, 7.8, -14, 0.05, 8.2, -14, 2.1, 8.2, -14, 0.05, 8.6, -14, 2.1, 8.6, -14, 0.05, 9, -14, 2.1, 9, -14, 0.05, 9.4, -14, 2.1, 9.4, -14, 0.05, 9.8, -14, 2.1, 9.8, -14, 0.05, 10.2, -14, 2.1, 10.2, -14, 0.05, 10.6, -14, 2.1, 10.6, -14, 0.05, 11, -14, 2.1, 11, -14, 0.05, 11.4, -14, 2.1, 11.4, -14, 0.05, 11.8, -14, 2.1, 11.8, -14, 0.05, 12.2, -14, 2.1, 12.2, -14, 0.05, 12.6, -14, 2.1, 12.6, -14, 0.05, 13, -14, 2.1, 13, -14, 0.05, 13.4, -14, 2.1, 13.4, -14, 0.05, 13.8, -14, 2.1, 13.8, -14, 0.05, 14.2, -14, 2.1, 14.2, -14, 0.05, 14.6, -14, 2.1, 14.6, -14, 0.05, 15, -14, 2.1, 15, -14, 0.05, 15.4, -14, 2.1, 15.4, -14, 0.05, 15.8, -14, 2.1, 15.8, -14, 0.05, 16.2, -14, 2.1, 16.2, -14, 0.05, 16.6, -14, 2.1, 16.6, -14, 0.05, 17, -14, 2.1, 17, -14, 0.05, 17.4, -14, 2.1, 17.4, -14, 0.05, 17.8, -14, 2.1, 17.8, -14, 0.05, 18.2, -14, 2.1, 18.2, -14, 0.05, 18.6, -14, 2.1, 18.6, -14, 0.05, 19, -14, 2.1, 19, -14, 0.05, 19.4, -14, 2.1, 19.4, -14, 0.05, 19.8, -14, 2.1, 19.8, -14, 0.05, 20.2, -14, 2.1, 20.2, -14, 0.05, 20.6, -14, 2.1, 20.6, -14, 0.05, 21, -14, 2.1, 21, -14, 0.3, -21, 14, 0.3, -21, -14, 0.6, -21, 14, 0.6, -21, -14, 0.9, -21, 14, 0.9, -21, -14, 1.2, -21, 14, 1.2, -21, -14, 1.5, -21, 14, 1.5, -21, -14, 1.8, -21, 14, 1.8, -21, -14, 2.1, -21, 14, 2.1, -21, -14, 0.05, -21, -14, 2.1, -21, -13.6, 0.05, -21, -13.6, 2.1, -21, -13.2, 0.05, -21, -13.2, 2.1, -21, -12.8, 0.05, -21, -12.8, 2.1, -21, -12.4, 0.05, -21, -12.4, 2.1, -21, -12, 0.05, -21, -12, 2.1, -21, -11.6, 0.05, -21, -11.6, 2.1, -21, -11.2, 0.05, -21, -11.2, 2.1, -21, -10.8, 0.05, -21, -10.8, 2.1, -21, -10.4, 0.05, -21, -10.4, 2.1, -21, -10, 0.05, -21, -10, 2.1, -21, -9.6, 0.05, -21, -9.6, 2.1, -21, -9.2, 0.05, -21, -9.2, 2.1, -21, -8.8, 0.05, -21, -8.8, 2.1, -21, -8.4, 0.05, -21, -8.4, 2.1, -21, -8, 0.05, -21, -8, 2.1, -21, -7.6, 0.05, -21, -7.6, 2.1, -21, -7.2, 0.05, -21, -7.2, 2.1, -21, -6.8, 0.05, -21, -6.8, 2.1, -21, -6.4, 0.05, -21, -6.4, 2.1, -21, -6, 0.05, -21, -6, 2.1, -21, -5.6, 0.05, -21, -5.6, 2.1, -21, -5.2, 0.05, -21, -5.2, 2.1, -21, -4.8, 0.05, -21, -4.8, 2.1, -21, -4.4, 0.05, -21, -4.4, 2.1, -21, -4, 0.05, -21, -4, 2.1, -21, -3.6, 0.05, -21, -3.6, 2.1, -21, -3.2, 0.05, -21, -3.2, 2.1, -21, -2.8, 0.05, -21, -2.8, 2.1, -21, -2.4, 0.05, -21, -2.4, 2.1, -21, -2, 0.05, -21, -2, 2.1, -21, -1.6, 0.05, -21, -1.6, 2.1, -21, -1.2, 0.05, -21, -1.2, 2.1, -21, -0.8, 0.05, -21, -0.8, 2.1, -21, -0.4, 0.05, -21, -0.4, 2.1, -21, 0, 0.05, -21, 0, 2.1, -21, 0.4, 0.05, -21, 0.4, 2.1, -21, 0.8, 0.05, -21, 0.8, 2.1, -21, 1.2, 0.05, -21, 1.2, 2.1, -21, 1.6, 0.05, -21, 1.6, 2.1, -21, 2, 0.05, -21, 2, 2.1, -21, 2.4, 0.05, -21, 2.4, 2.1, -21, 2.8, 0.05, -21, 2.8, 2.1, -21, 3.2, 0.05, -21, 3.2, 2.1, -21, 3.6, 0.05, -21, 3.6, 2.1, -21, 4, 0.05, -21, 4, 2.1, -21, 4.4, 0.05, -21, 4.4, 2.1, -21, 4.8, 0.05, -21, 4.8, 2.1, -21, 5.2, 0.05, -21, 5.2, 2.1, -21, 5.6, 0.05, -21, 5.6, 2.1, -21, 6, 0.05, -21, 6, 2.1, -21, 6.4, 0.05, -21, 6.4, 2.1, -21, 6.8, 0.05, -21, 6.8, 2.1, -21, 7.2, 0.05, -21, 7.2, 2.1, -21, 7.6, 0.05, -21, 7.6, 2.1, -21, 8, 0.05, -21, 8, 2.1, -21, 8.4, 0.05, -21, 8.4, 2.1, -21, 8.8, 0.05, -21, 8.8, 2.1, -21, 9.2, 0.05, -21, 9.2, 2.1, -21, 9.6, 0.05, -21, 9.6, 2.1, -21, 10, 0.05, -21, 10, 2.1, -21, 10.4, 0.05, -21, 10.4, 2.1, -21, 10.8, 0.05, -21, 10.8, 2.1, -21, 11.2, 0.05, -21, 11.2, 2.1, -21, 11.6, 0.05, -21, 11.6, 2.1, -21, 12, 0.05, -21, 12, 2.1, -21, 12.4, 0.05, -21, 12.4, 2.1, -21, 12.8, 0.05, -21, 12.8, 2.1, -21, 13.2, 0.05, -21, 13.2, 2.1, -21, 13.6, 0.05, -21, 13.6, 2.1, -21, 14, 0.05, -21, 14, 2.1, -21, 14, 0.3, -21, 14, 0.3, 21, 14, 0.6, -21, 14, 0.6, 21, 14, 0.9, -21, 14, 0.9, 21, 14, 1.2, -21, 14, 1.2, 21, 14, 1.5, -21, 14, 1.5, 21, 14, 1.8, -21, 14, 1.8, 21, 14, 2.1, -21, 14, 2.1, 21, 14, 0.05, -21, 14, 2.1, -21, 14, 0.05, -20.6, 14, 2.1, -20.6, 14, 0.05, -20.2, 14, 2.1, -20.2, 14, 0.05, -19.8, 14, 2.1, -19.8, 14, 0.05, -19.4, 14, 2.1, -19.4, 14, 0.05, -19, 14, 2.1, -19, 14, 0.05, -18.6, 14, 2.1, -18.6, 14, 0.05, -18.2, 14, 2.1, -18.2, 14, 0.05, -17.8, 14, 2.1, -17.8, 14, 0.05, -17.4, 14, 2.1, -17.4, 14, 0.05, -17, 14, 2.1, -17, 14, 0.05, -16.6, 14, 2.1, -16.6, 14, 0.05, -16.2, 14, 2.1, -16.2, 14, 0.05, -15.8, 14, 2.1, -15.8, 14, 0.05, -15.4, 14, 2.1, -15.4, 14, 0.05, -15, 14, 2.1, -15, 14, 0.05, -14.6, 14, 2.1, -14.6, 14, 0.05, -14.2, 14, 2.1, -14.2, 14, 0.05, -13.8, 14, 2.1, -13.8, 14, 0.05, -13.4, 14, 2.1, -13.4, 14, 0.05, -13, 14, 2.1, -13, 14, 0.05, -12.6, 14, 2.1, -12.6, 14, 0.05, -12.2, 14, 2.1, -12.2, 14, 0.05, -11.8, 14, 2.1, -11.8, 14, 0.05, -11.4, 14, 2.1, -11.4, 14, 0.05, -11, 14, 2.1, -11, 14, 0.05, -10.6, 14, 2.1, -10.6, 14, 0.05, -10.2, 14, 2.1, -10.2, 14, 0.05, -9.8, 14, 2.1, -9.8, 14, 0.05, -9.4, 14, 2.1, -9.4, 14, 0.05, -9, 14, 2.1, -9, 14, 0.05, -8.6, 14, 2.1, -8.6, 14, 0.05, -8.2, 14, 2.1, -8.2, 14, 0.05, -7.8, 14, 2.1, -7.8, 14, 0.05, -7.4, 14, 2.1, -7.4, 14, 0.05, -7, 14, 2.1, -7, 14, 0.05, -6.6, 14, 2.1, -6.6, 14, 0.05, -6.2, 14, 2.1, -6.2, 14, 0.05, -5.8, 14, 2.1, -5.8, 14, 0.05, -5.4, 14, 2.1, -5.4, 14, 0.05, -5, 14, 2.1, -5, 14, 0.05, -4.6, 14, 2.1, -4.6, 14, 0.05, -4.2, 14, 2.1, -4.2, 14, 0.05, -3.8, 14, 2.1, -3.8, 14, 0.05, -3.4, 14, 2.1, -3.4, 14, 0.05, -3, 14, 2.1, -3, 14, 0.05, -2.6, 14, 2.1, -2.6, 14, 0.05, -2.2, 14, 2.1, -2.2, 14, 0.05, -1.8, 14, 2.1, -1.8, 14, 0.05, -1.4, 14, 2.1, -1.4, 14, 0.05, -1, 14, 2.1, -1, 14, 0.05, -0.6, 14, 2.1, -0.6, 14, 0.05, -0.2, 14, 2.1, -0.2, 14, 0.05, 0.2, 14, 2.1, 0.2, 14, 0.05, 0.6, 14, 2.1, 0.6, 14, 0.05, 1, 14, 2.1, 1, 14, 0.05, 1.4, 14, 2.1, 1.4, 14, 0.05, 1.8, 14, 2.1, 1.8, 14, 0.05, 2.2, 14, 2.1, 2.2, 14, 0.05, 2.6, 14, 2.1, 2.6, 14, 0.05, 3, 14, 2.1, 3, 14, 0.05, 3.4, 14, 2.1, 3.4, 14, 0.05, 3.8, 14, 2.1, 3.8, 14, 0.05, 4.2, 14, 2.1, 4.2, 14, 0.05, 4.6, 14, 2.1, 4.6, 14, 0.05, 5, 14, 2.1, 5, 14, 0.05, 5.4, 14, 2.1, 5.4, 14, 0.05, 5.8, 14, 2.1, 5.8, 14, 0.05, 6.2, 14, 2.1, 6.2, 14, 0.05, 6.6, 14, 2.1, 6.6, 14, 0.05, 7, 14, 2.1, 7, 14, 0.05, 7.4, 14, 2.1, 7.4, 14, 0.05, 7.8, 14, 2.1, 7.8, 14, 0.05, 8.2, 14, 2.1, 8.2, 14, 0.05, 8.6, 14, 2.1, 8.6, 14, 0.05, 9, 14, 2.1, 9, 14, 0.05, 9.4, 14, 2.1, 9.4, 14, 0.05, 9.8, 14, 2.1, 9.8, 14, 0.05, 10.2, 14, 2.1, 10.2, 14, 0.05, 10.6, 14, 2.1, 10.6, 14, 0.05, 11, 14, 2.1, 11, 14, 0.05, 11.4, 14, 2.1, 11.4, 14, 0.05, 11.8, 14, 2.1, 11.8, 14, 0.05, 12.2, 14, 2.1, 12.2, 14, 0.05, 12.6, 14, 2.1, 12.6, 14, 0.05, 13, 14, 2.1, 13, 14, 0.05, 13.4, 14, 2.1, 13.4, 14, 0.05, 13.8, 14, 2.1, 13.8, 14, 0.05, 14.2, 14, 2.1, 14.2, 14, 0.05, 14.6, 14, 2.1, 14.6, 14, 0.05, 15, 14, 2.1, 15, 14, 0.05, 15.4, 14, 2.1, 15.4, 14, 0.05, 15.8, 14, 2.1, 15.8, 14, 0.05, 16.2, 14, 2.1, 16.2, 14, 0.05, 16.6, 14, 2.1, 16.6, 14, 0.05, 17, 14, 2.1, 17, 14, 0.05, 17.4, 14, 2.1, 17.4, 14, 0.05, 17.8, 14, 2.1, 17.8, 14, 0.05, 18.2, 14, 2.1, 18.2, 14, 0.05, 18.6, 14, 2.1, 18.6, 14, 0.05, 19, 14, 2.1, 19, 14, 0.05, 19.4, 14, 2.1, 19.4, 14, 0.05, 19.8, 14, 2.1, 19.8, 14, 0.05, 20.2, 14, 2.1, 20.2, 14, 0.05, 20.6, 14, 2.1, 20.6, 14, 0.05, 21, 14, 2.1, 21, -14, 0.3, 21, 14, 0.3, 21, -14, 0.6, 21, 14, 0.6, 21, -14, 0.9, 21, 14, 0.9, 21, -14, 1.2, 21, 14, 1.2, 21, -14, 1.5, 21, 14, 1.5, 21, -14, 1.8, 21, 14, 1.8, 21, -14, 2.1, 21, 14, 2.1, 21, -14, 0.05, 21, -14, 2.1, 21, -13.6, 0.05, 21, -13.6, 2.1, 21, -13.2, 0.05, 21, -13.2, 2.1, 21, -12.8, 0.05, 21, -12.8, 2.1, 21, -12.4, 0.05, 21, -12.4, 2.1, 21, -12, 0.05, 21, -12, 2.1, 21, -11.6, 0.05, 21, -11.6, 2.1, 21, -11.2, 0.05, 21, -11.2, 2.1, 21, -10.8, 0.05, 21, -10.8, 2.1, 21, -10.4, 0.05, 21, -10.4, 2.1, 21, -10, 0.05, 21, -10, 2.1, 21, -9.6, 0.05, 21, -9.6, 2.1, 21, -9.2, 0.05, 21, -9.2, 2.1, 21, -8.8, 0.05, 21, -8.8, 2.1, 21, -8.4, 0.05, 21, -8.4, 2.1, 21, -8, 0.05, 21, -8, 2.1, 21, -7.6, 0.05, 21, -7.6, 2.1, 21, -7.2, 0.05, 21, -7.2, 2.1, 21, -6.8, 0.05, 21, -6.8, 2.1, 21, -6.4, 0.05, 21, -6.4, 2.1, 21, -6, 0.05, 21, -6, 2.1, 21, -5.6, 0.05, 21, -5.6, 2.1, 21, -5.2, 0.05, 21, -5.2, 2.1, 21, -4.8, 0.05, 21, -4.8, 2.1, 21, -4.4, 0.05, 21, -4.4, 2.1, 21, -4, 0.05, 21, -4, 2.1, 21, -3.6, 0.05, 21, -3.6, 2.1, 21, -3.2, 0.05, 21, -3.2, 2.1, 21, -2.8, 0.05, 21, -2.8, 2.1, 21, -2.4, 0.05, 21, -2.4, 2.1, 21, -2, 0.05, 21, -2, 2.1, 21, -1.6, 0.05, 21, -1.6, 2.1, 21, -1.2, 0.05, 21, -1.2, 2.1, 21, -0.8, 0.05, 21, -0.8, 2.1, 21, -0.4, 0.05, 21, -0.4, 2.1, 21, 0, 0.05, 21, 0, 2.1, 21, 0.4, 0.05, 21, 0.4, 2.1, 21, 0.8, 0.05, 21, 0.8, 2.1, 21, 1.2, 0.05, 21, 1.2, 2.1, 21, 1.6, 0.05, 21, 1.6, 2.1, 21, 2, 0.05, 21, 2, 2.1, 21, 2.4, 0.05, 21, 2.4, 2.1, 21, 2.8, 0.05, 21, 2.8, 2.1, 21, 3.2, 0.05, 21, 3.2, 2.1, 21, 3.6, 0.05, 21, 3.6, 2.1, 21, 4, 0.05, 21, 4, 2.1, 21, 4.4, 0.05, 21, 4.4, 2.1, 21, 4.8, 0.05, 21, 4.8, 2.1, 21, 5.2, 0.05, 21, 5.2, 2.1, 21, 5.6, 0.05, 21, 5.6, 2.1, 21, 6, 0.05, 21, 6, 2.1, 21, 6.4, 0.05, 21, 6.4, 2.1, 21, 6.8, 0.05, 21, 6.8, 2.1, 21, 7.2, 0.05, 21, 7.2, 2.1, 21, 7.6, 0.05, 21, 7.6, 2.1, 21, 8, 0.05, 21, 8, 2.1, 21, 8.4, 0.05, 21, 8.4, 2.1, 21, 8.8, 0.05, 21, 8.8, 2.1, 21, 9.2, 0.05, 21, 9.2, 2.1, 21, 9.6, 0.05, 21, 9.6, 2.1, 21, 10, 0.05, 21, 10, 2.1, 21, 10.4, 0.05, 21, 10.4, 2.1, 21, 10.8, 0.05, 21, 10.8, 2.1, 21, 11.2, 0.05, 21, 11.2, 2.1, 21, 11.6, 0.05, 21, 11.6, 2.1, 21, 12, 0.05, 21, 12, 2.1, 21, 12.4, 0.05, 21, 12.4, 2.1, 21, 12.8, 0.05, 21, 12.8, 2.1, 21, 13.2, 0.05, 21, 13.2, 2.1, 21, 13.6, 0.05, 21, 13.6, 2.1, 21, 14, 0.05, 21, 14, 2.1, 21)
+line_color = Color(0.501961, 0.576471, 0.600000, 1)
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("r_16")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+rotation = Vector3(-0.837758, -0.488692, 0)
+light_color = Color(1, 0.9412, 0.8353, 1)
+light_energy = 1.25
+shadow_enabled = true
+directional_shadow_max_distance = 95.0
+
+[node name="ClubSign" type="Label3D" parent="."]
+position = Vector3(0, 3.4, -22.2)
+text = "IEG  /  TRAINING"
+font_size = 110
+pixel_size = 0.012
+outline_size = 0
+modulate = Color(0.15, 0.235, 0.29, 1)

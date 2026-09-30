@@ -1,0 +1,45 @@
+Contrôles structurels exécutés sur le projet GDScript.
+
+OK Aucun composant C#/.NET
+OK Configuration Godot sans feature C# ni section dotnet
+OK Scène principale correcte
+OK 60 ticks physiques/s
+OK Toutes les références res:// existent — 41 références
+OK IDs ressources : tests/test_runner.tscn
+OK load_steps : test_runner.tscn
+OK IDs ressources : scenes/training_ground.tscn
+OK load_steps : training_ground.tscn
+OK IDs ressources : scenes/characters/player_view.tscn
+OK load_steps : player_view.tscn
+OK IDs ressources : scenes/environment/training_environment.tscn
+OK load_steps : training_environment.tscn
+OK IDs ressources : assets/players/player_07.tres
+OK load_steps : player_07.tres
+OK IDs ressources : assets/players/player_08.tres
+OK load_steps : player_08.tres
+OK IDs ressources : assets/players/player_10.tres
+OK load_steps : player_10.tres
+OK Classe unique IEGPlayerState
+OK Classe unique IEGPlayerProfile
+OK Classe unique IEGTrainingSession
+OK Classe unique IEGBallState
+OK Classe unique IEGTrainingRules
+OK Classe unique IEGGameCommand
+OK Classe unique IEGLocalPlayerInput
+OK Classe unique IEGTrainingHud
+OK Classe unique IEGOrbitCamera
+OK Classe unique IEGPlayerView
+OK Toutes les classes IEG sont définies
+OK Toutes les actions utilisées sont déclarées — 17 actions enregistrées
+OK Contrôles manette multi-périphérique
+OK Touches physiques AZERTY/QWERTY
+OK GLB complet footballer.glb
+OK GLB autonome footballer.glb
+OK Buffer views footballer.glb
+OK 4 animations originales intégrées — Idle, Kick, Run, Walk
+OK GLB complet football.glb
+OK GLB autonome football.glb
+OK Buffer views football.glb
+OK Pas de cache .godot ni de vieux .gdignore
+
+Ces vérifications ne lancent pas Godot et ne certifient pas le gameplay.

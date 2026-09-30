@@ -1,0 +1,18 @@
+Syntaxe seulement, analyse externe Lark / grammaire GDScript.
+Ne valide ni le typage/API Godot, ni le rendu, ni le gameplay natif.
+
+core/ball_state.gd: OK
+core/game_command.gd: OK
+core/player_profile.gd: OK
+core/player_state.gd: OK
+core/training_rules.gd: OK
+core/training_session.gd: OK
+scripts/input/local_player_input.gd: OK
+scripts/match/training_ground.gd: OK
+scripts/presentation/line_segments.gd: OK
+scripts/presentation/orbit_camera.gd: OK
+scripts/presentation/player_view.gd: OK
+scripts/presentation/training_hud.gd: OK
+tests/test_cli.gd: OK
+tests/test_runner.gd: OK
+tests/test_suite.gd: OK

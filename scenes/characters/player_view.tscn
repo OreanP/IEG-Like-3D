@@ -1,0 +1,51 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scripts/presentation/player_view.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://assets/characters/footballer.glb" id="2_model"]
+[ext_resource type="Resource" path="res://assets/players/player_07.tres" id="3_profile"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_selected"]
+shading_mode = 0
+albedo_color = Color(1, 0.8, 0.3843, 1)
+[sub_resource type="StandardMaterial3D" id="Mat_target"]
+shading_mode = 0
+albedo_color = Color(0.54, 0.933, 0.914, 1)
+[sub_resource type="TorusMesh" id="Ring_selected"]
+inner_radius = 0.44
+outer_radius = 0.51
+rings = 48
+ring_segments = 8
+[sub_resource type="TorusMesh" id="Ring_target"]
+inner_radius = 0.57
+outer_radius = 0.605
+rings = 48
+ring_segments = 8
+
+[node name="Player" type="Node3D"]
+script = ExtResource("1_script")
+profile = ExtResource("3_profile")
+
+[node name="VisualModel" parent="." instance=ExtResource("2_model")]
+
+[node name="SelectionRing" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.035, 0)
+scale = Vector3(1, 0.4, 1)
+cast_shadow = 0
+mesh = SubResource("Ring_selected")
+material_override = SubResource("Mat_selected")
+
+[node name="PassTargetRing" type="MeshInstance3D" parent="."]
+visible = false
+position = Vector3(0, 0.037, 0)
+scale = Vector3(1, 0.4, 1)
+cast_shadow = 0
+mesh = SubResource("Ring_target")
+material_override = SubResource("Mat_target")
+
+[node name="Number" type="Label3D" parent="."]
+position = Vector3(0, 2.12, 0)
+pixel_size = 0.009
+billboard = 1
+text = "07"
+font_size = 38
+outline_size = 8

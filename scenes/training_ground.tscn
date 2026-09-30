@@ -1,0 +1,57 @@
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://scripts/match/training_ground.gd" id="1_main"]
+[ext_resource type="PackedScene" path="res://scenes/environment/training_environment.tscn" id="2_environment"]
+[ext_resource type="PackedScene" path="res://scenes/characters/player_view.tscn" id="3_player"]
+[ext_resource type="Resource" path="res://assets/players/player_08.tres" id="4_profile"]
+[ext_resource type="Resource" path="res://assets/players/player_10.tres" id="5_profile"]
+[ext_resource type="PackedScene" path="res://assets/ball/football.glb" id="6_ball"]
+[ext_resource type="Script" path="res://scripts/input/local_player_input.gd" id="7_input"]
+[ext_resource type="Script" path="res://scripts/presentation/orbit_camera.gd" id="8_camera"]
+[ext_resource type="Script" path="res://scripts/presentation/training_hud.gd" id="9_hud"]
+
+[node name="TrainingGround" type="Node3D"]
+process_mode = 3
+script = ExtResource("1_main")
+
+[node name="Environment" parent="." instance=ExtResource("2_environment")]
+
+[node name="Players" type="Node3D" parent="."]
+process_mode = 1
+
+[node name="Player07" parent="Players" instance=ExtResource("3_player")]
+position = Vector3(0, 0, 8)
+
+[node name="Player08" parent="Players" instance=ExtResource("3_player")]
+position = Vector3(-5, 0, 2)
+profile = ExtResource("4_profile")
+
+[node name="Player10" parent="Players" instance=ExtResource("3_player")]
+position = Vector3(5, 0, -1)
+profile = ExtResource("5_profile")
+
+[node name="BallView" parent="." instance=ExtResource("6_ball")]
+position = Vector3(0, 0.19, 7.39)
+
+[node name="LocalInput" type="Node" parent="."]
+script = ExtResource("7_input")
+
+[node name="CameraRig" type="Node3D" parent="."]
+physics_interpolation_mode = 2
+script = ExtResource("8_camera")
+
+[node name="Camera3D" type="Camera3D" parent="CameraRig"]
+position = Vector3(0, 9.36, 21.64)
+rotation = Vector3(-0.55, 0, 0)
+current = true
+fov = 58.0
+near = 0.1
+far = 250.0
+
+[node name="AimArrow" type="MeshInstance3D" parent="."]
+physics_interpolation_mode = 2
+cast_shadow = 0
+
+[node name="HUD" type="CanvasLayer" parent="."]
+process_mode = 3
+script = ExtResource("9_hud")
