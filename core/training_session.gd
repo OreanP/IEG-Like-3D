@@ -1,36 +1,54 @@
 class_name IEGTrainingSession
 extends RefCounted
-## Autorité locale de l'entraînement S0. Ni Input, ni Node, ni animation.
+## Autorité locale S1. Ni Input, ni Node, ni animation.
+## Le joueur et l'IA fournissent des commandes ; seule la session décide.
 ## step() est appelé exactement une fois par tick physique, à 60 Hz.
 ## Ce n'est pas encore le moteur d'un match à onze contre onze.
 
 const Rules = preload("res://core/training_rules.gd")
+const DuelRules = preload("res://core/duel_rules.gd")
 const Command = preload("res://core/game_command.gd")
 const PlayerState = preload("res://core/player_state.gd")
 const BallState = preload("res://core/ball_state.gd")
 const Profile = preload("res://core/player_profile.gd")
 
-enum EventKind { PASS, SHOT, RECEPTION, GOAL, OUT, RESET, SELECTION }
+enum EventKind { PASS, SHOT, RECEPTION, GOAL, OUT, RESET, SELECTION,
+    TACKLE_ATTEMPT, TACKLE_WON, TACKLE_MISSED, INTERCEPTION }
+
+const LOCAL_TEAM: int = 0
 
 var players: Array[IEGPlayerState] = []
 var events: Array[Dictionary] = []
 var ball: IEGBallState = BallState.new()
 var controlled_id: int = 7
 var goals: int = 0
+var team_goals: Array[int] = [0, 0]
 var tick_number: int = 0
 var _reset_timer: float = 0.0
 var _since_kick: float = 10.0
 var _last_kicker: int = -1
 
-func _init(profiles: Array[IEGPlayerProfile] = []) -> void:
+func _init(profiles: Array[IEGPlayerProfile] = [],
+        start_positions: Array[Vector2] = [], team_ids: Array[int] = []) -> void:
     var roster: Array[IEGPlayerProfile] = profiles.duplicate()
-    if not _valid_roster(roster):
-        if not roster.is_empty():
-            push_warning("Effectif S0 invalide : utilisation des trois profils par défaut.")
+    var spawns: Array[Vector2] = start_positions.duplicate()
+    var teams: Array[int] = team_ids.duplicate()
+    if roster.is_empty():
         roster = default_profiles()
-    var spawns: Array[Vector2] = [Vector2(0.0, 8.0), Vector2(-5.0, 2.0), Vector2(5.0, -1.0)]
+    if spawns.is_empty():
+        var defaults: Array[Vector2] = [Vector2(0.0, 8.0), Vector2(-5.0, 2.0), Vector2(5.0, -1.0)]
+        for index: int in range(roster.size()):
+            spawns.append(defaults[index] if index < defaults.size() else Vector2(float(index - 3) * 2.0, -6.0))
+    if teams.is_empty():
+        for _index: int in range(roster.size()):
+            teams.append(LOCAL_TEAM)
+    if not valid_setup(roster, spawns, teams):
+        push_warning("Effectif S1 invalide : retour aux trois joueurs S0.")
+        roster = default_profiles()
+        spawns = [Vector2(0.0, 8.0), Vector2(-5.0, 2.0), Vector2(5.0, -1.0)]
+        teams = [0, 0, 0]
     for index: int in range(roster.size()):
-        players.append(PlayerState.new(roster[index], spawns[index]))
+        players.append(PlayerState.new(roster[index], spawns[index], teams[index]))
     _reset_positions()
     events.clear()
 
@@ -47,15 +65,25 @@ static func default_profiles() -> Array[IEGPlayerProfile]:
         result.append(profile)
     return result
 
-static func _valid_roster(roster: Array[IEGPlayerProfile]) -> bool:
-    if roster.size() != 3:
+static func valid_setup(roster: Array[IEGPlayerProfile],
+        spawns: Array[Vector2], teams: Array[int]) -> bool:
+    if roster.is_empty() or roster.size() != spawns.size() or roster.size() != teams.size():
         return false
     var ids: Array[int] = []
-    for profile: IEGPlayerProfile in roster:
+    var has_local_player: bool = false
+    for index: int in range(roster.size()):
+        var profile: IEGPlayerProfile = roster[index]
         if profile == null or not profile.is_valid() or profile.player_id in ids:
             return false
+        if teams[index] != 0 and teams[index] != 1:
+            return false
+        if not spawns[index].is_finite():
+            return false
+        if absf(spawns[index].x) > Rules.HALF_WIDTH - 0.6 or absf(spawns[index].y) > Rules.HALF_LENGTH - 0.6:
+            return false
         ids.append(profile.player_id)
-    return true
+        has_local_player = has_local_player or teams[index] == LOCAL_TEAM
+    return has_local_player
 
 func get_player(player_id: int) -> IEGPlayerState:
     for player: IEGPlayerState in players:
@@ -70,12 +98,14 @@ func is_resetting() -> bool:
     return _reset_timer > 0.0
 
 func suggested_pass_target(aim: Vector2) -> IEGPlayerState:
-    var actor: IEGPlayerState = controlled()
+    return _pass_target_for(controlled(), aim)
+
+func _pass_target_for(actor: IEGPlayerState, aim: Vector2) -> IEGPlayerState:
     var direction: Vector2 = Rules.direction(aim, actor.facing)
     var best: IEGPlayerState = null
     var best_score: float = -INF
     for other: IEGPlayerState in players:
-        if other.get_id() == actor.get_id():
+        if other.get_id() == actor.get_id() or other.team_id != actor.team_id:
             continue
         var offset: Vector2 = other.position - actor.position
         var distance: float = offset.length()
@@ -86,7 +116,7 @@ func suggested_pass_target(aim: Vector2) -> IEGPlayerState:
             best = other
     return best
 
-func step(command: IEGGameCommand) -> void:
+func step(command: IEGGameCommand, ai_commands: Dictionary = {}) -> void:
     if command == null:
         command = Command.new()
     tick_number += 1
@@ -100,41 +130,106 @@ func step(command: IEGGameCommand) -> void:
             _reset_positions()
         return
     if command.switch_player:
-        var index: int = players.find(controlled())
-        controlled_id = players[(index + 1) % players.size()].get_id()
-        _emit(EventKind.SELECTION, controlled_id)
-    _advance_players(command)
+        _select_next_teammate()
+    var commands: Dictionary = _commands_for_tick(command, ai_commands)
+    _advance_players(commands)
     _since_kick += Rules.TICK
     if ball.owner_id >= 0:
         _follow_owner()
-        if ball.owner_id == controlled_id and not command.switch_player:
-            if command.pass_ball:
-                _pass(command.aim)
-            elif command.shoot:
-                _shoot(command.aim, command.shot_charge)
+        var owner: IEGPlayerState = get_player(ball.owner_id)
+        if owner != null:
+            var owner_command: IEGGameCommand = commands[owner.get_id()]
+            var selection_changed: bool = owner.team_id == LOCAL_TEAM and command.switch_player
+            if not selection_changed and owner.recovery_time <= 0.0:
+                if owner_command.pass_ball:
+                    _pass(owner, owner_command.aim)
+                elif owner_command.shoot:
+                    _shoot(owner, owner_command.aim, owner_command.shot_charge)
+    # Choix S1 : une passe/un tir déclenché ce tick précède les prises de balle.
+    # La protection du nouveau porteur empêche plusieurs vols au même tick.
+    for player: IEGPlayerState in players:
+        var player_command: IEGGameCommand = commands[player.get_id()]
+        if player_command.tackle:
+            _try_tackle(player, player_command.aim)
     if ball.owner_id < 0:
         _advance_ball()
+    else:
+        _follow_owner()
 
-func _advance_players(command: IEGGameCommand) -> void:
-    var move: Vector2 = Rules.limit_input(command.move)
+func _select_next_teammate() -> void:
+    var teammates: Array[IEGPlayerState] = []
     for player: IEGPlayerState in players:
-        var active: bool = player.get_id() == controlled_id
-        var moving: bool = active and move.length_squared() > 0.001
+        if player.team_id == LOCAL_TEAM:
+            teammates.append(player)
+    var index: int = teammates.find(controlled())
+    controlled_id = teammates[(index + 1) % teammates.size()].get_id()
+    _emit(EventKind.SELECTION, controlled_id)
+
+func _commands_for_tick(local_command: IEGGameCommand, ai_commands: Dictionary) -> Dictionary:
+    var result: Dictionary = {}
+    for player: IEGPlayerState in players:
+        var intent: IEGGameCommand = Command.new()
+        if player.get_id() == controlled_id:
+            intent = local_command
+        elif player.team_id != LOCAL_TEAM:
+            var proposed: Variant = ai_commands.get(player.get_id())
+            if proposed is IEGGameCommand:
+                intent = proposed
+        result[player.get_id()] = intent
+    return result
+
+func _advance_players(commands: Dictionary) -> void:
+    for player: IEGPlayerState in players:
+        var command: IEGGameCommand = commands[player.get_id()]
+        var move: Vector2 = Rules.limit_input(command.move)
+        var moving: bool = move.length_squared() > 0.001
+        player.tackle_cooldown = maxf(0.0, player.tackle_cooldown - Rules.TICK)
+        player.recovery_time = maxf(0.0, player.recovery_time - Rules.TICK)
+        player.possession_grace = maxf(0.0, player.possession_grace - Rules.TICK)
         if player.energy <= 1.0:
             player.sprint_exhausted = true
         elif player.energy >= 20.0:
             player.sprint_exhausted = false
-        var sprinting: bool = moving and command.sprint and not player.sprint_exhausted
+        var sprinting: bool = moving and command.sprint and not player.sprint_exhausted and player.recovery_time <= 0.0
         var speed: float = player.profile.sprint_speed if sprinting else player.profile.run_speed
-        var target: Vector2 = move * speed if active else Vector2.ZERO
+        if player.recovery_time > 0.0:
+            speed *= DuelRules.RECOVERY_SPEED_FACTOR
+        var target: Vector2 = move * speed
         player.velocity = player.velocity.lerp(target, 1.0 - exp(-13.0 * Rules.TICK))
-        player.position += player.velocity * Rules.TICK
-        player.position = _clamp_player(player.position)
+        player.position = _clamp_player(player.position + player.velocity * Rules.TICK)
         if moving:
             player.facing = move.normalized()
         var energy_rate: float = -19.0 if sprinting else 11.0
         player.energy = clampf(player.energy + energy_rate * Rules.TICK, 0.0, 100.0)
     _separate_players()
+
+func _try_tackle(actor: IEGPlayerState, aim: Vector2) -> void:
+    var owner: IEGPlayerState = get_player(ball.owner_id)
+    if owner == null or owner.team_id == actor.team_id:
+        return
+    if actor.tackle_cooldown > 0.0 or actor.recovery_time > 0.0:
+        return
+    if actor.energy < DuelRules.TACKLE_ENERGY:
+        return
+    actor.energy -= DuelRules.TACKLE_ENERGY
+    actor.tackle_cooldown = DuelRules.TACKLE_COOLDOWN
+    actor.recovery_time = DuelRules.TACKLE_RECOVERY
+    actor.facing = Rules.direction(aim, actor.facing)
+    _emit(EventKind.TACKLE_ATTEMPT, actor.get_id(), owner.get_id())
+    var offset: Vector2 = owner.position - actor.position
+    var in_range: bool = offset.length() <= DuelRules.TACKLE_RANGE
+    var in_front: bool = offset.length_squared() < 0.0001 or actor.facing.dot(offset.normalized()) >= cos(DuelRules.TACKLE_HALF_ANGLE)
+    if not in_range or not in_front or owner.possession_grace > 0.0:
+        _emit(EventKind.TACKLE_MISSED, actor.get_id(), owner.get_id())
+        return
+    owner.recovery_time = maxf(owner.recovery_time, DuelRules.STAGGER_DURATION)
+    owner.velocity *= DuelRules.RECOVERY_SPEED_FACTOR
+    actor.possession_grace = DuelRules.POSSESSION_GRACE
+    ball.owner_id = actor.get_id()
+    ball.mode = BallState.Mode.HELD
+    ball.velocity = Vector3.ZERO
+    _follow_owner()
+    _emit(EventKind.TACKLE_WON, actor.get_id(), owner.get_id())
 
 func _clamp_player(value: Vector2) -> Vector2:
     return value.clamp(Vector2(-Rules.HALF_WIDTH + 0.6, -Rules.HALF_LENGTH + 0.6),
@@ -166,9 +261,8 @@ func _follow_owner() -> void:
     ball.position = Rules.on_ground(owner.position + owner.facing * (0.61 + bounce))
     ball.velocity = Rules.on_ground(owner.velocity, 0.0)
 
-func _pass(aim: Vector2) -> void:
-    var actor: IEGPlayerState = controlled()
-    var receiver: IEGPlayerState = suggested_pass_target(aim)
+func _pass(actor: IEGPlayerState, aim: Vector2) -> void:
+    var receiver: IEGPlayerState = _pass_target_for(actor, aim)
     if receiver == null:
         return
     # Point choisi au départ : aucune poursuite magique de la cible ensuite.
@@ -178,11 +272,11 @@ func _pass(aim: Vector2) -> void:
     _follow_owner()
     var speed: float = clampf(actor.position.distance_to(target) * 1.2, 11.0, 21.0)
     _release(actor.get_id(), BallState.Mode.PASS, Rules.on_ground(direction * speed, 0.0))
-    controlled_id = receiver.get_id()
+    if actor.team_id == LOCAL_TEAM:
+        controlled_id = receiver.get_id()
     _emit(EventKind.PASS, actor.get_id(), receiver.get_id())
 
-func _shoot(aim: Vector2, charge: float) -> void:
-    var actor: IEGPlayerState = controlled()
+func _shoot(actor: IEGPlayerState, aim: Vector2, charge: float) -> void:
     charge = clampf(charge, 0.0, 1.0) if is_finite(charge) else 0.0
     var direction: Vector2 = Rules.direction(aim, actor.facing)
     actor.facing = direction
@@ -224,6 +318,8 @@ func _advance_ball() -> void:
     for player: IEGPlayerState in players:
         if player.get_id() == _last_kicker and _since_kick < 0.35:
             continue
+        if player.recovery_time > 0.0:
+            continue
         var t: float = Rules.closest_segment_time(Rules.planar(before),
             Rules.planar(next_position), player.position)
         var point: Vector3 = before.lerp(next_position, t)
@@ -236,14 +332,23 @@ func _advance_ball() -> void:
         ball.owner_id = first.get_id()
         ball.mode = BallState.Mode.HELD
         ball.velocity = Vector3.ZERO
+        first.possession_grace = DuelRules.POSSESSION_GRACE
         _follow_owner()
-        _emit(EventKind.RECEPTION, first.get_id())
+        var kicker: IEGPlayerState = get_player(_last_kicker)
+        var interception: bool = kicker != null and kicker.team_id != first.team_id
+        if first.team_id == LOCAL_TEAM:
+            controlled_id = first.get_id()
+        _emit(EventKind.INTERCEPTION if interception else EventKind.RECEPTION, first.get_id(), _last_kicker)
         return
     if is_finite(goal_t):
         goals += 1
+        # Le but franchi détermine le score, y compris un but contre son camp.
+        var scoring_team: int = 0 if next_position.z < 0.0 else 1
+        team_goals[scoring_team] += 1
         _reset_timer = 1.4
         ball.velocity = Vector3.ZERO
         _emit(EventKind.GOAL, _last_kicker)
+        events[events.size() - 1]["team_id"] = scoring_team
         return
     if (absf(next_position.x) > Rules.HALF_WIDTH + 0.3
             or absf(next_position.z) > Rules.HALF_LENGTH + 0.3):
@@ -257,7 +362,10 @@ func _advance_ball() -> void:
 func _reset_positions() -> void:
     for player: IEGPlayerState in players:
         player.reset()
-    controlled_id = players[0].get_id()
+    for player: IEGPlayerState in players:
+        if player.team_id == LOCAL_TEAM:
+            controlled_id = player.get_id()
+            break
     ball.owner_id = controlled_id
     ball.mode = BallState.Mode.HELD
     _last_kicker = -1
@@ -273,12 +381,14 @@ func make_snapshot() -> Dictionary:
     # Sérialisable en JSON ; pas de références de nœuds. Ce n'est pas du réseau actif.
     var states: Array[Dictionary] = []
     for player: IEGPlayerState in players:
-        states.append({"id": player.get_id(),
+        states.append({"id": player.get_id(), "team_id": player.team_id,
+            "tackle_cooldown": player.tackle_cooldown, "recovery_time": player.recovery_time,
+            "possession_grace": player.possession_grace,
             "position": [player.position.x, player.position.y],
             "velocity": [player.velocity.x, player.velocity.y],
             "facing": [player.facing.x, player.facing.y], "energy": player.energy})
-    return {"version": 1, "tick": tick_number, "controlled_id": controlled_id,
-        "goals": goals, "players": states,
+    return {"version": 2, "tick": tick_number, "controlled_id": controlled_id,
+        "goals": goals, "team_goals": team_goals.duplicate(), "players": states,
         "ball": {"owner_id": ball.owner_id, "mode": ball.mode,
             "position": [ball.position.x, ball.position.y, ball.position.z],
             "velocity": [ball.velocity.x, ball.velocity.y, ball.velocity.z]}}

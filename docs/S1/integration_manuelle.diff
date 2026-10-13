@@ -1,0 +1,270 @@
+--- a/core/game_command.gd
++++ b/core/game_command.gd
+@@ -7,6 +7,7 @@
+ var sprint: bool = false
+ var pass_ball: bool = false
+ var shoot: bool = false
++var tackle: bool = false
+ var shot_charge: float = 0.0
+ var switch_player: bool = false
+ var reset_drill: bool = false
+@@ -16,7 +17,7 @@
+         "move": [move.x, move.y], "aim": [aim.x, aim.y],
+         "sprint": sprint, "pass_ball": pass_ball, "shoot": shoot,
+         "shot_charge": shot_charge, "switch_player": switch_player,
+-        "reset_drill": reset_drill,
++        "reset_drill": reset_drill, "tackle": tackle,
+     }
+ 
+ static func from_dict(data: Dictionary) -> IEGGameCommand:
+@@ -26,6 +27,7 @@
+     command.sprint = data.get("sprint", false) == true
+     command.pass_ball = data.get("pass_ball", false) == true
+     command.shoot = data.get("shoot", false) == true
++    command.tackle = data.get("tackle", false) == true
+     command.switch_player = data.get("switch_player", false) == true
+     command.reset_drill = data.get("reset_drill", false) == true
+     var charge_value: Variant = data.get("shot_charge", 0.0)
+--- a/core/player_state.gd
++++ b/core/player_state.gd
+@@ -1,19 +1,24 @@
+ class_name IEGPlayerState
+ extends RefCounted
+-## État mutable, indépendant des nœuds visuels.
++## État mutable. L'équipe appartient au match, pas au profil du personnage.
+ 
+ var profile: IEGPlayerProfile
++var team_id: int = 0
+ var position: Vector2 = Vector2.ZERO
+ var spawn: Vector2 = Vector2.ZERO
+ var velocity: Vector2 = Vector2.ZERO
+ var facing: Vector2 = Vector2(0.0, -1.0)
+ var energy: float = 100.0
+ var sprint_exhausted: bool = false
++var tackle_cooldown: float = 0.0
++var recovery_time: float = 0.0
++var possession_grace: float = 0.0
+ 
+-func _init(source: IEGPlayerProfile, start: Vector2) -> void:
++func _init(source: IEGPlayerProfile, start: Vector2, team: int = 0) -> void:
+     profile = source
+     position = start
+     spawn = start
++    team_id = team
+ 
+ func get_id() -> int:
+     return profile.player_id
+@@ -21,6 +26,9 @@
+ func reset() -> void:
+     position = spawn
+     velocity = Vector2.ZERO
+-    facing = Vector2(0.0, -1.0)
++    facing = Vector2(0.0, -1.0) if team_id == 0 else Vector2(0.0, 1.0)
+     energy = 100.0
+     sprint_exhausted = false
++    tackle_cooldown = 0.0
++    recovery_time = 0.0
++    possession_grace = 0.0
+--- a/scripts/presentation/player_view.gd
++++ b/scripts/presentation/player_view.gd
+@@ -3,6 +3,7 @@
+ ## L'état vient de la session. Remplacer le GLB ne change pas les règles du jeu.
+ 
+ @export var profile: IEGPlayerProfile
++@export_enum("Alliés:0", "Adversaires:1") var team_id: int = 0
+ @onready var visual_model: Node3D = $VisualModel
+ @onready var selection_ring: MeshInstance3D = $SelectionRing
+ @onready var target_ring: MeshInstance3D = $PassTargetRing
+--- a/scripts/input/local_player_input.gd
++++ b/scripts/input/local_player_input.gd
+@@ -91,6 +91,7 @@
+     command.sprint = Input.is_action_pressed("sprint")
+     command.switch_player = Input.is_action_just_pressed("switch_player")
+     command.pass_ball = Input.is_action_just_pressed("pass_ball")
++    command.tackle = Input.is_action_just_pressed("tackle")
+     command.reset_drill = Input.is_action_just_pressed("reset_drill")
+     var held: bool = Input.is_action_pressed("shoot")
+     if not held:
+--- a/scripts/match/training_ground.gd
++++ b/scripts/match/training_ground.gd
+@@ -5,6 +5,10 @@
+ const Session = preload("res://core/training_session.gd")
+ const Command = preload("res://core/game_command.gd")
+ const Rules = preload("res://core/training_rules.gd")
++const DefenderBrain = preload("res://core/ai/defender_brain.gd")
++
++@export_group("Opposition S1")
++@export var opposition_enabled: bool = true
+ 
+ @export_group("Contrôles")
+ @export_range(0.05, 0.45, 0.01) var stick_deadzone: float = 0.22
+@@ -21,6 +25,7 @@
+ @onready var aim_arrow: MeshInstance3D = $AimArrow
+ var session: IEGTrainingSession
+ var _views: Dictionary = {}
++var _brains: Dictionary = {}
+ var _aim_mesh: ImmediateMesh = ImmediateMesh.new()
+ var _aim_material: StandardMaterial3D = StandardMaterial3D.new()
+ var _paused: bool = false
+@@ -34,21 +39,8 @@
+     controls.charge_seconds = shot_charge_seconds
+     camera_rig.mouse_sensitivity = mouse_sensitivity
+     camera_rig.stick_sensitivity = stick_camera_speed
+-    var roster: Array[IEGPlayerProfile] = []
+-    for child: Node in players_root.get_children():
+-        if child is IEGPlayerView:
+-            roster.append(child.profile)
+-    session = Session.new(roster)
+-    var index: int = 0
+-    for child: Node in players_root.get_children():
+-        if child is IEGPlayerView:
+-            var state: IEGPlayerState = session.players[index]
+-            if child.profile != state.profile:
+-                child.configure(state.profile)
+-            _views[state.get_id()] = child
+-            child.sync_state(state, state.get_id() == session.controlled_id, false, 1.0)
+-            child.reset_physics_interpolation()
+-            index += 1
++    if not _create_session():
++        return
+     ball_view.position = session.ball.position
+     ball_view.reset_physics_interpolation()
+     _aim_material.albedo_color = Color("8aeee9")
+@@ -61,7 +53,7 @@
+     camera_rig.snap(Vector3(session.controlled().position.x, 1.0, session.controlled().position.y))
+     _ready_complete = true
+     hud.refresh(0.0, session, controls)
+-    print("IEG Like GDScript S0 — entraînement chargé. Aucun composant C#.")
++    print("IEG Like S1 — opposition chargée (%d joueurs)." % session.players.size())
+ 
+ func _input(event: InputEvent) -> void:
+     if _ready_complete and event.is_action_pressed("pause") and not event.is_echo():
+@@ -97,12 +89,12 @@
+     if not _ready_complete or _paused:
+         return
+     if Engine.physics_ticks_per_second != 60:
+-        push_error("S0 nécessite 60 ticks physiques par seconde (réglage déjà fourni).")
++        push_error("La simulation nécessite 60 ticks physiques par seconde.")
+         _set_paused(true)
+         return
+     var has_ball: bool = session.ball.owner_id == session.controlled_id and not session.is_resetting()
+     var command: IEGGameCommand = controls.read_command(camera_rig, has_ball)
+-    session.step(command)
++    session.step(command, _create_ai_commands())
+     _sync_views(Rules.TICK)
+     for event: Dictionary in session.events:
+         _present(event)
+@@ -170,13 +162,62 @@
+             hud.show_message("Réception du n°%02d" % actor_id)
+         Session.EventKind.GOAL:
+             controls.cancel_charge()
+-            hud.show_message("BUT !  Remise en place…")
++            var scoring_team: int = int(event.get("team_id", 0))
++            hud.show_message("BUT DES BLEUS !" if scoring_team == 0 else "BUT DES ROUGES !")
+         Session.EventKind.OUT:
+             controls.cancel_charge()
+             hud.show_message("Ballon sorti — remise en place.")
++        Session.EventKind.TACKLE_ATTEMPT:
++            var tackler: IEGPlayerView = _views[actor_id]
++            tackler.kick() # Animation de contact provisoire, pas une glissade.
++        Session.EventKind.TACKLE_WON:
++            controls.cancel_charge()
++            hud.show_message("Récupération du n°%02d !" % actor_id)
++        Session.EventKind.TACKLE_MISSED:
++            if actor_id == session.controlled_id:
++                hud.show_message("Trop loin, mal orienté ou porteur encore protégé.")
++        Session.EventKind.INTERCEPTION:
++            controls.cancel_charge()
++            hud.show_message("Interception du n°%02d !" % actor_id)
+         Session.EventKind.RESET:
+             controls.cancel_charge()
+             for view: IEGPlayerView in _views.values():
+                 view.reset_physics_interpolation()
+             ball_view.reset_physics_interpolation()
+             camera_rig.snap(Vector3(session.controlled().position.x, 1.0, session.controlled().position.y))
++
++func _create_session() -> bool:
++    var roster: Array[IEGPlayerProfile] = []
++    var spawns: Array[Vector2] = []
++    var teams: Array[int] = []
++    var views: Array[IEGPlayerView] = []
++    for child: Node in players_root.get_children():
++        if child is IEGPlayerView:
++            views.append(child)
++            roster.append(child.profile)
++            spawns.append(Vector2(child.position.x, child.position.z))
++            teams.append(child.team_id)
++    if not Session.valid_setup(roster, spawns, teams):
++        push_error("Effectif invalide : profils/ID uniques, équipes 0 ou 1, au moins un allié, positions sur le terrain.")
++        return false
++    session = Session.new(roster, spawns, teams)
++    _views.clear()
++    _brains.clear()
++    for view: IEGPlayerView in views:
++        var state: IEGPlayerState = session.get_player(view.profile.player_id)
++        _views[state.get_id()] = view
++        if state.team_id != Session.LOCAL_TEAM:
++            _brains[state.get_id()] = DefenderBrain.new()
++        view.sync_state(state, state.get_id() == session.controlled_id, false, 1.0)
++        view.reset_physics_interpolation()
++    return true
++
++func _create_ai_commands() -> Dictionary:
++    var commands: Dictionary = {}
++    if not opposition_enabled:
++        return commands
++    for actor_id: int in _brains:
++        var brain: IEGDefenderBrain = _brains[actor_id]
++        var actor: IEGPlayerState = session.get_player(actor_id)
++        commands[actor_id] = brain.decide(session, actor)
++    return commands
+--- a/scripts/presentation/training_hud.gd
++++ b/scripts/presentation/training_hud.gd
+@@ -31,8 +31,8 @@
+     _device = _text(brand, "Clavier / souris", 13, Color("adbfce"))
+     _device.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+     var score_panel: VBoxContainer = _panel(Vector2(0.5, 0.0), Rect2(-105, 22, 210, 101))
+-    _text(score_panel, "FINITION LIBRE", 14, Color("adbfce")).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+-    _score = _text(score_panel, "00  BUT", 30, Color.WHITE)
++    _text(score_panel, "BLEUS / ROUGES", 14, Color("adbfce")).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
++    _score = _text(score_panel, "00 — 00", 30, Color.WHITE)
+     _score.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+     var player_panel: VBoxContainer = _panel(Vector2(0.0, 1.0), Rect2(24, -195, 340, 171))
+     _text(player_panel, "JOUEUR CONTRÔLÉ", 13, Color("adbfce"))
+@@ -40,7 +40,7 @@
+     _status = _text(player_panel, "En possession", 14, Color("8aeee9"))
+     _energy = _bar(player_panel, 100.0, Color("f1c36d"))
+     _charge = _bar(player_panel, 1.0, Color("75deda"))
+-    var help: VBoxContainer = _panel(Vector2.ONE, Rect2(-486, -195, 462, 171))
++    var help: VBoxContainer = _panel(Vector2.ONE, Rect2(-486, -215, 462, 191))
+     _text(help, "COMMANDES", 13, Color("adbfce"))
+     _controls = _text(help, "", 15, Color("edf4f8"))
+     _controls.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+@@ -78,7 +78,7 @@
+     center.add_child(column)
+     _text(column, "PAUSE", 42, Color("f5d691")).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+     var description: Label = _text(column,
+-        "Entraînement libre à trois joueurs\nPas encore d'adversaires ni de techniques spéciales.",
++        "Trois alliés contre un défenseur\nPasse, interception et récupération debout.",
+         19, Color("b6c9d6"))
+     description.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+     _resume = _button(column, "Reprendre", func(): resume_requested.emit())
+@@ -116,7 +116,9 @@
+     _energy.value = player.energy
+     _charge.value = controls.charge
+     _charge.visible = controls.charge > 0.0
+-    _score.text = "%02d  BUT%s" % [session.goals, "S" if session.goals > 1 else ""]
++    _score.text = "%02d — %02d" % [session.team_goals[0], session.team_goals[1]]
++    if player.tackle_cooldown > 0.0:
++        _status.text = "Récupération : %.1f s" % player.tackle_cooldown
+     var pad_name: String = Input.get_joy_name(controls.last_gamepad) if controls.last_gamepad >= 0 else ""
+     if controls.uses_gamepad:
+         _device.text = "Manette : " + pad_name
+@@ -129,6 +131,7 @@
+     else:
+         _device.text = "Clavier / souris · manette utilisable à tout moment"
+         _controls.text = "ZQSD / WASD : bouger   Maj : sprint\nEspace : passe   Clic gauche / F : tir chargé\nTab : joueur   Clic droit glissé : caméra\nMolette : zoom   C : recentrer   R : replacer"
++    _controls.text += "\nB / Cercle / E : récupérer"
+     _message_life = maxf(0.0, _message_life - delta)
+     _message.visible = _message_life > 0.0
+ 

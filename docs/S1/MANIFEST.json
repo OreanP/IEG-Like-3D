@@ -1,0 +1,32 @@
+{
+  "base": "IEG-Like-Godot-GDScript.zip / S0",
+  "overwritten_existing_files": [
+    "core/training_session.gd"
+  ],
+  "manual_script_files": [
+    "core/game_command.gd",
+    "core/player_state.gd",
+    "scripts/presentation/player_view.gd",
+    "scripts/input/local_player_input.gd",
+    "scripts/match/training_ground.gd",
+    "scripts/presentation/training_hud.gd"
+  ],
+  "editor_changes": [
+    "project.godot : action tackle",
+    "scenes/training_ground.tscn : instance Defender21"
+  ],
+  "files": {
+    "core/training_session.gd": "7d6ec93b9dadd76f2f0287fa8c251c2fcac85353b3e6897b520ccb198862ca42",
+    "core/duel_rules.gd": "8a5beeac72fe95b2afab38961c56ede0f24c08822e6b8e53295557f7ec68a286",
+    "core/ai/defender_brain.gd": "50fb14008923e5076ea25679af2fab7cdbe09b08a02b03ce27901447570478ab",
+    "assets/players/defender_21.tres": "f88d7d70585fcd21749de47ef6de82beabfef485c2b089362896375cb7b5c3ce",
+    "tests/s1/test_suite.gd": "8ba218f60c1f62cc202d2ff99ea38854029e5bc5c187c7a8199f718862c27232",
+    "tests/s1/test_runner.gd": "fbd692d9ea955fee07113bf9ef069ff9e15186ec04fac7de85d7d0d2945ff52f",
+    "tests/s1/test_cli.gd": "402f22d50c088b11083f1295a4152e222d3ac07fd5c59a7a7501cabcbc8aca8e",
+    "tests/s1/test_runner.tscn": "79242bdfd5c636c3076f210d327b2b96a1a10002c65a65d9d02b52c7f6ca659e",
+    "docs/S1/INTEGRATION.md": "3003a160548486709867aebd6581937b3377a586aabc75c07d16d6f06a76a88a",
+    "docs/S1/session_changes.diff": "35e3ec69335f6abc7df6fc2e2b711620301cd7a909e1e0af0b926f6d6ce570e4",
+    "docs/S1/integration_manuelle.diff": "ca07fec2c59da50ced31c62996c0e3bfa81f228321a16c3c622511cf23a8b3ed",
+    "docs/S1/VALIDATION.md": "00df1ca3c9110de7ff8c66be1ae245c851daa54b1868f07516a05c011b1c444a"
+  }
+}
