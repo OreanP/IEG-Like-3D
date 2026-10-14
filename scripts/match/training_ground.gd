@@ -2,6 +2,9 @@ extends Node3D
 ## Assemblage de la session locale, des entrées et de la présentation.
 ## La scène de terrain et les joueurs sont visibles dans l'éditeur.
 
+const Brain = preload("res://core/ai/defender_brain.gd")
+var _brain: IEGDefenderBrain = Brain.new()
+
 const Session = preload("res://core/training_session.gd")
 const Command = preload("res://core/game_command.gd")
 const Rules = preload("res://core/training_rules.gd")
@@ -35,10 +38,14 @@ func _ready() -> void:
     camera_rig.mouse_sensitivity = mouse_sensitivity
     camera_rig.stick_sensitivity = stick_camera_speed
     var roster: Array[IEGPlayerProfile] = []
+    var starts: Array[Vector2] = []
+    var teams: Array[int] = []
     for child: Node in players_root.get_children():
         if child is IEGPlayerView:
             roster.append(child.profile)
-    session = Session.new(roster)
+            starts.append(Vector2(child.position.x, child.position.z))
+            teams.append(child.team_id)
+    session = Session.new(roster, starts, teams)
     var index: int = 0
     for child: Node in players_root.get_children():
         if child is IEGPlayerView:
@@ -102,7 +109,11 @@ func _physics_process(_delta: float) -> void:
         return
     var has_ball: bool = session.ball.owner_id == session.controlled_id and not session.is_resetting()
     var command: IEGGameCommand = controls.read_command(camera_rig, has_ball)
-    session.step(command)
+    var ai_commands: Dictionary = {}
+    for player: IEGPlayerState in session.players:
+        if player.team_id != Session.LOCAL_TEAM:
+            ai_commands[player.get_id()] = _brain.decide(session, player)
+    session.step(command, ai_commands)
     _sync_views(Rules.TICK)
     for event: Dictionary in session.events:
         _present(event)
@@ -161,13 +172,18 @@ func _present(event: Dictionary) -> void:
         Session.EventKind.PASS:
             var passer: IEGPlayerView = _views[actor_id]
             passer.kick()
-            hud.show_message("Passe vers le n°%02d — tu le contrôles maintenant." % int(event["target_id"]))
+            hud.show_message("Passe vers le n°%02d — cible sélectionnée." % int(event["target_id"]))
         Session.EventKind.SHOT:
             var shooter: IEGPlayerView = _views[actor_id]
             shooter.kick()
             hud.show_message("Tir !")
         Session.EventKind.RECEPTION:
             hud.show_message("Réception du n°%02d" % actor_id)
+        Session.EventKind.TACKLE_ATTEMPT:
+            _views[actor_id].kick()
+        Session.EventKind.TACKLE_WON, Session.EventKind.INTERCEPTION:
+            controls.cancel_charge()
+            hud.show_message("Récupération du n°%02d" % actor_id)
         Session.EventKind.GOAL:
             controls.cancel_charge()
             hud.show_message("BUT !  Remise en place…")

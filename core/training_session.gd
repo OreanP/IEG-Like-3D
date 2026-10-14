@@ -226,6 +226,8 @@ func _try_tackle(actor: IEGPlayerState, aim: Vector2) -> void:
     owner.velocity *= DuelRules.RECOVERY_SPEED_FACTOR
     actor.possession_grace = DuelRules.POSSESSION_GRACE
     ball.owner_id = actor.get_id()
+    if actor.team_id == LOCAL_TEAM:
+        controlled_id = actor.get_id()
     ball.mode = BallState.Mode.HELD
     ball.velocity = Vector3.ZERO
     _follow_owner()

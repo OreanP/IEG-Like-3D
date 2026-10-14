@@ -88,6 +88,7 @@ func read_command(camera: IEGOrbitCamera, has_ball: bool) -> IEGGameCommand:
         return command
     command.move = world_move(camera)
     command.aim = aim(camera)
+    command.tackle = Input.is_action_just_pressed("tackle")
     command.sprint = Input.is_action_pressed("sprint")
     command.switch_player = Input.is_action_just_pressed("switch_player")
     command.pass_ball = Input.is_action_just_pressed("pass_ball")

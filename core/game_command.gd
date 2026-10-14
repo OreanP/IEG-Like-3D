@@ -4,6 +4,7 @@ extends RefCounted
 
 var move: Vector2 = Vector2.ZERO
 var aim: Vector2 = Vector2(0.0, -1.0)
+var tackle: bool = false
 var sprint: bool = false
 var pass_ball: bool = false
 var shoot: bool = false
@@ -14,7 +15,7 @@ var reset_drill: bool = false
 func to_dict() -> Dictionary:
     return {
         "move": [move.x, move.y], "aim": [aim.x, aim.y],
-        "sprint": sprint, "pass_ball": pass_ball, "shoot": shoot,
+        "tackle": tackle, "sprint": sprint, "pass_ball": pass_ball, "shoot": shoot,
         "shot_charge": shot_charge, "switch_player": switch_player,
         "reset_drill": reset_drill,
     }
@@ -23,6 +24,7 @@ static func from_dict(data: Dictionary) -> IEGGameCommand:
     var command: IEGGameCommand = IEGGameCommand.new()
     command.move = _read_vector(data.get("move", null), Vector2.ZERO)
     command.aim = _read_vector(data.get("aim", null), Vector2(0.0, -1.0))
+    command.tackle = data.get("tackle", false) == true
     command.sprint = data.get("sprint", false) == true
     command.pass_ball = data.get("pass_ball", false) == true
     command.shoot = data.get("shoot", false) == true

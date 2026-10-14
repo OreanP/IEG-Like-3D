@@ -2,6 +2,7 @@ class_name IEGPlayerView
 extends Node3D
 ## L'état vient de la session. Remplacer le GLB ne change pas les règles du jeu.
 
+@export_enum("Alliés:0", "Adversaires:1") var team_id: int = 0
 @export var profile: IEGPlayerProfile
 @onready var visual_model: Node3D = $VisualModel
 @onready var selection_ring: MeshInstance3D = $SelectionRing

@@ -134,6 +134,11 @@ zoom_out={
 ]
 }
 
+tackle={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"physical_keycode":69), Object(InputEventJoypadButton,"button_index":1)]
+}
+
 [input_devices]
 
 joypads/ignore_joypad_on_unfocused_application=true
