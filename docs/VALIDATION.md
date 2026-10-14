@@ -1,3 +1,5 @@
+> État historique S0. La validation moteur de la branche de développement est désormais exécutée et détaillée dans [DEVELOPMENT.md](DEVELOPMENT.md) : 87 tests, 12 contrôles scène/entrées et 7 scénarios réussis sous Godot 4.7. Ne pas réappliquer les diffs S1 sur cette branche.
+
 # État de validation — livraison GDScript S0
 
 ## Effectué dans l'environnement de préparation

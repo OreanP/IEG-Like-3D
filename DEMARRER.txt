@@ -1,7 +1,7 @@
 IEG LIKE GODOT — VERSION GDSCRIPT
 
 1. Extraire ce dossier séparément de l'ancien projet C#.
-2. Ouvrir Godot standard 4.5+ (branche 4.x).
+2. Ouvrir Godot standard 4.7 stable.
 3. Importer le project.godot de CE dossier.
 4. Laisser Godot importer les modèles 3D.
 5. F5 pour lancer l'entraînement.
@@ -17,8 +17,10 @@ Sprint : RT/R2/Maj. Joueur suivant : LB/L1/Tab.
 R : replacer. C : recentrer. Échap/Start/Options : pause.
 
 Les contrôles détaillés et la liste des fonctions sont dans README.md.
-Les limites de validation sont dans docs/VALIDATION.md : vérifications de syntaxe
-et de structure réalisées, mais Godot n'a pas été exécuté dans l'environnement
-ayant préparé l'archive. Les 30 tests GDScript sont fournis, pas certifiés exécutés.
+Validation actuelle : voir docs/DEVELOPMENT.md.
+87 tests natifs, 12 contrôles scène/entrées et 7 scénarios de diagnostic réussis
+sous Godot standard 4.7. Rendu sur écran et manette physique non essayés.
 
-Tests facultatifs : ouvrir tests/test_runner.tscn puis F6.
+Tests : bash tools/validate.sh (cloud Linux).
+Diagnostic interactif : ouvrir scenes/diagnostic.tscn puis F6.
+Tacle : B/Rond/E. Lob : Y/Triangle/G. Cible : RB/R1/Q physique.

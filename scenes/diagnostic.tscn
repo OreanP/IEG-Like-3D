@@ -1,0 +1,10 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/training_ground.tscn" id="1"]
+[ext_resource type="Script" path="res://scripts/match/diagnostic.gd" id="2"]
+
+[node name="DiagnosticGround" instance=ExtResource("1")]
+auto_pause_on_focus_loss = false
+
+[node name="Diagnostic" type="Node" parent="."]
+script = ExtResource("2")
