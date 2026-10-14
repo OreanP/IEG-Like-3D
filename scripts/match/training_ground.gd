@@ -2,6 +2,12 @@ extends Node3D
 ## Assemblage de la session locale, des entrées et de la présentation.
 ## La scène de terrain et les joueurs sont visibles dans l'éditeur.
 
+const CollectiveBrain = preload("res://core/ai/collective_brain.gd")
+const KeeperBrain = preload("res://core/ai/goalkeeper_brain.gd")
+var _collective: IEGCollectiveBrain = CollectiveBrain.new()
+var _keeper_brain: IEGGoalkeeperBrain = KeeperBrain.new()
+var _last_controlled_id: int = -1
+
 const Brain = preload("res://core/ai/defender_brain.gd")
 var _brain: IEGDefenderBrain = Brain.new()
 
@@ -40,12 +46,14 @@ func _ready() -> void:
     var roster: Array[IEGPlayerProfile] = []
     var starts: Array[Vector2] = []
     var teams: Array[int] = []
+    var keepers: Array[bool] = []
     for child: Node in players_root.get_children():
         if child is IEGPlayerView:
             roster.append(child.profile)
             starts.append(Vector2(child.position.x, child.position.z))
             teams.append(child.team_id)
-    session = Session.new(roster, starts, teams)
+            keepers.append(child.is_goalkeeper)
+    session = Session.new(roster, starts, teams, keepers)
     var index: int = 0
     for child: Node in players_root.get_children():
         if child is IEGPlayerView:
@@ -68,7 +76,7 @@ func _ready() -> void:
     camera_rig.snap(Vector3(session.controlled().position.x, 1.0, session.controlled().position.y))
     _ready_complete = true
     hud.refresh(0.0, session, controls)
-    print("IEG Like GDScript S0 — entraînement chargé. Aucun composant C#.")
+    print("IEG Like GDScript — entraînement chargé. Aucun composant C#.")
 
 func _input(event: InputEvent) -> void:
     if _ready_complete and event.is_action_pressed("pause") and not event.is_echo():
@@ -104,15 +112,28 @@ func _physics_process(_delta: float) -> void:
     if not _ready_complete or _paused:
         return
     if Engine.physics_ticks_per_second != 60:
-        push_error("S0 nécessite 60 ticks physiques par seconde (réglage déjà fourni).")
+        push_error("La simulation nécessite 60 ticks physiques par seconde.")
         _set_paused(true)
         return
+    if _last_controlled_id != session.controlled_id:
+        controls.cancel_charge()
+        controls.pass_target_id = -1
+        _last_controlled_id = session.controlled_id
     var has_ball: bool = session.ball.owner_id == session.controlled_id and not session.is_resetting()
-    var command: IEGGameCommand = controls.read_command(camera_rig, has_ball)
+    var command: IEGGameCommand = controls.read_command(camera_rig, has_ball, session)
     var ai_commands: Dictionary = {}
     for player: IEGPlayerState in session.players:
-        if player.team_id != Session.LOCAL_TEAM:
-            ai_commands[player.get_id()] = _brain.decide(session, player)
+        if player.get_id() == session.controlled_id:
+            continue
+        if player.is_goalkeeper:
+            ai_commands[player.get_id()] = _keeper_brain.decide(session, player)
+        elif player.team_id == Session.LOCAL_TEAM:
+            ai_commands[player.get_id()] = _collective.decide(session, player)
+        else:
+            var intent: IEGGameCommand = _collective.decide(session, player)
+            if session.ball.owner_id == player.get_id():
+                intent = _brain.decide(session, player)
+            ai_commands[player.get_id()] = intent
     session.step(command, ai_commands)
     _sync_views(Rules.TICK)
     for event: Dictionary in session.events:
@@ -121,7 +142,7 @@ func _physics_process(_delta: float) -> void:
 func _sync_views(delta: float) -> void:
     var target: IEGPlayerState = null
     if session.ball.owner_id == session.controlled_id:
-        target = session.suggested_pass_target(controls.aim(camera_rig))
+        target = session.get_player(controls.pass_target_id) if controls.pass_target_id >= 0 else session.suggested_pass_target(controls.aim(camera_rig))
     for player: IEGPlayerState in session.players:
         var view: IEGPlayerView = _views[player.get_id()]
         view.sync_state(player, player.get_id() == session.controlled_id,
@@ -169,15 +190,27 @@ func _present(event: Dictionary) -> void:
     var kind: int = int(event["kind"])
     var actor_id: int = int(event["actor_id"])
     match kind:
-        Session.EventKind.PASS:
+        Session.EventKind.PASS, Session.EventKind.KEEPER_RELEASE:
             var passer: IEGPlayerView = _views[actor_id]
             passer.kick()
-            hud.show_message("Passe vers le n°%02d — cible sélectionnée." % int(event["target_id"]))
+            var target_id: int = int(event["target_id"])
+            if session.get_player(actor_id).team_id == Session.LOCAL_TEAM:
+                hud.show_message("Passe vers le n°%02d — cible sélectionnée." % target_id)
+            else:
+                hud.show_message("Relance adverse vers le n°%02d" % target_id)
         Session.EventKind.SHOT:
             var shooter: IEGPlayerView = _views[actor_id]
             shooter.kick()
             hud.show_message("Tir !")
+        Session.EventKind.KEEPER_DEFLECTION:
+            _views[actor_id].represent_save(false)
+            hud.show_message("Déviation du gardien — ballon libre")
+        Session.EventKind.KEEPER_CAPTURE:
+            _views[actor_id].represent_save(true)
+            controls.cancel_charge()
+            hud.show_message("Capture du gardien n°%02d" % actor_id)
         Session.EventKind.RECEPTION:
+            controls.cancel_charge()
             hud.show_message("Réception du n°%02d" % actor_id)
         Session.EventKind.TACKLE_ATTEMPT:
             _views[actor_id].kick()

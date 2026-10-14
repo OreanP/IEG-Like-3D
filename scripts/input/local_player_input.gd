@@ -5,6 +5,7 @@ extends Node
 const Command = preload("res://core/game_command.gd")
 const Rules = preload("res://core/training_rules.gd")
 
+var pass_target_id: int = -1
 var stick_deadzone: float = 0.22
 var charge_seconds: float = 0.85
 var charge: float = 0.0
@@ -75,7 +76,7 @@ func aim(camera: IEGOrbitCamera) -> Vector2:
         result = Vector2(forward.x, forward.z)
     return result
 
-func read_command(camera: IEGOrbitCamera, has_ball: bool) -> IEGGameCommand:
+func read_command(camera: IEGOrbitCamera, has_ball: bool, session: IEGTrainingSession = null) -> IEGGameCommand:
     var command: IEGGameCommand = Command.new()
     if not enabled:
         return command
@@ -91,7 +92,11 @@ func read_command(camera: IEGOrbitCamera, has_ball: bool) -> IEGGameCommand:
     command.tackle = Input.is_action_just_pressed("tackle")
     command.sprint = Input.is_action_pressed("sprint")
     command.switch_player = Input.is_action_just_pressed("switch_player")
-    command.pass_ball = Input.is_action_just_pressed("pass_ball")
+    if session != null and Input.is_action_just_pressed("pass_target_next"):
+        cycle_pass_target(session)
+    command.pass_target_id = pass_target_id
+    command.lob_pass = Input.is_action_just_pressed("lob_pass")
+    command.pass_ball = Input.is_action_just_pressed("pass_ball") or command.lob_pass
     command.reset_drill = Input.is_action_just_pressed("reset_drill")
     var held: bool = Input.is_action_pressed("shoot")
     if not held:
@@ -107,3 +112,15 @@ func read_command(camera: IEGOrbitCamera, has_ball: bool) -> IEGGameCommand:
         charge = 0.0
         _charging = false
     return command
+
+func cycle_pass_target(session: IEGTrainingSession) -> void:
+    var ids: Array[int] = []
+    for player: IEGPlayerState in session.players:
+        if player.team_id == session.LOCAL_TEAM and player.get_id() != session.controlled_id:
+            ids.append(player.get_id())
+    if ids.is_empty():
+        pass_target_id = -1
+        return
+    # Le dernier cran revient au ciblage directionnel.
+    var index: int = ids.find(pass_target_id) + 1
+    pass_target_id = ids[index] if index < ids.size() else -1

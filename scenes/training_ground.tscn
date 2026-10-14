@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://scripts/match/training_ground.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://scenes/environment/training_environment.tscn" id="2_environment"]
@@ -11,6 +11,10 @@
 [ext_resource type="Script" path="res://scripts/presentation/training_hud.gd" id="9_hud"]
 
 [ext_resource type="Resource" path="res://assets/players/defender_21.tres" id="10_defender"]
+
+[ext_resource type="Resource" path="res://assets/players/keeper_blue.tres" id="11_keeper_blue"]
+[ext_resource type="Resource" path="res://assets/players/keeper_red.tres" id="12_keeper_red"]
+[ext_resource type="Resource" path="res://assets/players/opponent_22.tres" id="13_opponent"]
 
 [node name="TrainingGround" type="Node3D"]
 process_mode = 3
@@ -36,6 +40,22 @@ profile = ExtResource("5_profile")
 position = Vector3(0, 0, -5)
 profile = ExtResource("10_defender")
 team_id = 1
+
+[node name="Opponent22" parent="Players" instance=ExtResource("3_player")]
+position = Vector3(6, 0, -7)
+profile = ExtResource("13_opponent")
+team_id = 1
+
+[node name="KeeperBlue" parent="Players" instance=ExtResource("3_player")]
+position = Vector3(0, 0, 16.2)
+profile = ExtResource("11_keeper_blue")
+is_goalkeeper = true
+
+[node name="KeeperRed" parent="Players" instance=ExtResource("3_player")]
+position = Vector3(0, 0, -16.2)
+profile = ExtResource("12_keeper_red")
+team_id = 1
+is_goalkeeper = true
 
 [node name="BallView" parent="." instance=ExtResource("6_ball")]
 position = Vector3(0, 0.19, 7.39)

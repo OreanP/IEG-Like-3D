@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="IEGPlayerProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/player_profile.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+player_id = 31
+shirt_number = 31
+display_name = "Gardien rouge"
+kit_color = Color(0.95, 0.65, 0.12, 1)

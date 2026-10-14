@@ -13,7 +13,8 @@ const BallState = preload("res://core/ball_state.gd")
 const Profile = preload("res://core/player_profile.gd")
 
 enum EventKind { PASS, SHOT, RECEPTION, GOAL, OUT, RESET, SELECTION,
-    TACKLE_ATTEMPT, TACKLE_WON, TACKLE_MISSED, INTERCEPTION }
+    TACKLE_ATTEMPT, TACKLE_WON, TACKLE_MISSED, INTERCEPTION,
+    KEEPER_CAPTURE, KEEPER_DEFLECTION, KEEPER_RELEASE }
 
 const LOCAL_TEAM: int = 0
 
@@ -29,7 +30,7 @@ var _since_kick: float = 10.0
 var _last_kicker: int = -1
 
 func _init(profiles: Array[IEGPlayerProfile] = [],
-        start_positions: Array[Vector2] = [], team_ids: Array[int] = []) -> void:
+        start_positions: Array[Vector2] = [], team_ids: Array[int] = [], goalkeeper_roles: Array[bool] = []) -> void:
     var roster: Array[IEGPlayerProfile] = profiles.duplicate()
     var spawns: Array[Vector2] = start_positions.duplicate()
     var teams: Array[int] = team_ids.duplicate()
@@ -48,7 +49,8 @@ func _init(profiles: Array[IEGPlayerProfile] = [],
         spawns = [Vector2(0.0, 8.0), Vector2(-5.0, 2.0), Vector2(5.0, -1.0)]
         teams = [0, 0, 0]
     for index: int in range(roster.size()):
-        players.append(PlayerState.new(roster[index], spawns[index], teams[index]))
+        var keeper: bool = index < goalkeeper_roles.size() and goalkeeper_roles[index]
+        players.append(PlayerState.new(roster[index], spawns[index], teams[index], keeper))
     _reset_positions()
     events.clear()
 
@@ -119,6 +121,7 @@ func _pass_target_for(actor: IEGPlayerState, aim: Vector2) -> IEGPlayerState:
 func step(command: IEGGameCommand, ai_commands: Dictionary = {}) -> void:
     if command == null:
         command = Command.new()
+    command = Command.from_dict(command.to_dict())
     tick_number += 1
     events.clear()
     if command.reset_drill:
@@ -142,7 +145,7 @@ func step(command: IEGGameCommand, ai_commands: Dictionary = {}) -> void:
             var selection_changed: bool = owner.team_id == LOCAL_TEAM and command.switch_player
             if not selection_changed and owner.recovery_time <= 0.0:
                 if owner_command.pass_ball:
-                    _pass(owner, owner_command.aim)
+                    _pass(owner, owner_command)
                 elif owner_command.shoot:
                     _shoot(owner, owner_command.aim, owner_command.shot_charge)
     # Choix S1 : une passe/un tir déclenché ce tick précède les prises de balle.
@@ -171,10 +174,15 @@ func _commands_for_tick(local_command: IEGGameCommand, ai_commands: Dictionary) 
         var intent: IEGGameCommand = Command.new()
         if player.get_id() == controlled_id:
             intent = local_command
-        elif player.team_id != LOCAL_TEAM:
+        else:
             var proposed: Variant = ai_commands.get(player.get_id())
             if proposed is IEGGameCommand:
-                intent = proposed
+                intent = Command.from_dict(proposed.to_dict())
+            # Même une commande injectée ne permet pas à un allié IA de jouer
+            # une passe/un tir. Un gain de possession le sélectionnera ensuite.
+            if player.team_id == LOCAL_TEAM:
+                intent.pass_ball = false
+                intent.shoot = false
         result[player.get_id()] = intent
     return result
 
@@ -183,6 +191,8 @@ func _advance_players(commands: Dictionary) -> void:
         var command: IEGGameCommand = commands[player.get_id()]
         var move: Vector2 = Rules.limit_input(command.move)
         var moving: bool = move.length_squared() > 0.001
+        if player.is_goalkeeper:
+            player.keeper_hold_time = player.keeper_hold_time + Rules.TICK if ball.owner_id == player.get_id() else 0.0
         player.tackle_cooldown = maxf(0.0, player.tackle_cooldown - Rules.TICK)
         player.recovery_time = maxf(0.0, player.recovery_time - Rules.TICK)
         player.possession_grace = maxf(0.0, player.possession_grace - Rules.TICK)
@@ -197,6 +207,10 @@ func _advance_players(commands: Dictionary) -> void:
         var target: Vector2 = move * speed
         player.velocity = player.velocity.lerp(target, 1.0 - exp(-13.0 * Rules.TICK))
         player.position = _clamp_player(player.position + player.velocity * Rules.TICK)
+        if player.is_goalkeeper:
+            var side: float = 1.0 if player.team_id == 0 else -1.0
+            player.position.x = clampf(player.position.x, -4.0, 4.0)
+            player.position.y = clampf(player.position.y * side, 12.0, 17.4) * side
         if moving:
             player.facing = move.normalized()
         var energy_rate: float = -19.0 if sprinting else 11.0
@@ -208,6 +222,8 @@ func _try_tackle(actor: IEGPlayerState, aim: Vector2) -> void:
     if owner == null or owner.team_id == actor.team_id:
         return
     if actor.tackle_cooldown > 0.0 or actor.recovery_time > 0.0:
+        return
+    if owner.is_goalkeeper and ball.mode == BallState.Mode.HELD:
         return
     if actor.energy < DuelRules.TACKLE_ENERGY:
         return
@@ -225,11 +241,7 @@ func _try_tackle(actor: IEGPlayerState, aim: Vector2) -> void:
     owner.recovery_time = maxf(owner.recovery_time, DuelRules.STAGGER_DURATION)
     owner.velocity *= DuelRules.RECOVERY_SPEED_FACTOR
     actor.possession_grace = DuelRules.POSSESSION_GRACE
-    ball.owner_id = actor.get_id()
-    if actor.team_id == LOCAL_TEAM:
-        controlled_id = actor.get_id()
-    ball.mode = BallState.Mode.HELD
-    ball.velocity = Vector3.ZERO
+    _gain_possession(actor)
     _follow_owner()
     _emit(EventKind.TACKLE_WON, actor.get_id(), owner.get_id())
 
@@ -260,11 +272,18 @@ func _follow_owner() -> void:
         return
     var bounce: float = 0.045 * sin(float(tick_number) * 0.32)
     bounce *= clampf(owner.velocity.length() / 5.0, 0.0, 1.0)
-    ball.position = Rules.on_ground(owner.position + owner.facing * (0.61 + bounce))
+    ball.position = Rules.on_ground(owner.position + owner.facing * (0.61 + bounce),
+        1.1 if owner.is_goalkeeper else Rules.BALL_RADIUS)
     ball.velocity = Rules.on_ground(owner.velocity, 0.0)
 
-func _pass(actor: IEGPlayerState, aim: Vector2) -> void:
-    var receiver: IEGPlayerState = _pass_target_for(actor, aim)
+func _pass(actor: IEGPlayerState, command: IEGGameCommand) -> void:
+    var receiver: IEGPlayerState = null
+    if command.pass_target_id >= 0:
+        receiver = get_player(command.pass_target_id)
+        if receiver == null or receiver == actor or receiver.team_id != actor.team_id:
+            return
+    else:
+        receiver = _pass_target_for(actor, command.aim)
     if receiver == null:
         return
     # Point choisi au départ : aucune poursuite magique de la cible ensuite.
@@ -273,10 +292,19 @@ func _pass(actor: IEGPlayerState, aim: Vector2) -> void:
     actor.facing = direction
     _follow_owner()
     var speed: float = clampf(actor.position.distance_to(target) * 1.2, 11.0, 21.0)
-    _release(actor.get_id(), BallState.Mode.PASS, Rules.on_ground(direction * speed, 0.0))
+    var velocity: Vector3 = Rules.on_ground(direction * speed, 0.0)
+    if command.lob_pass:
+        var distance: float = Rules.planar(ball.position).distance_to(target)
+        var flight: float = clampf(distance / 11.0, 1.05, 1.7)
+        velocity = Rules.on_ground(direction * (distance / flight),
+            (Rules.BALL_RADIUS - ball.position.y + 0.5 * Rules.GRAVITY * flight * flight) / flight)
+    elif actor.is_goalkeeper:
+        ball.position.y = Rules.BALL_RADIUS
+    _release(actor.get_id(), BallState.Mode.PASS, velocity)
     if actor.team_id == LOCAL_TEAM:
         controlled_id = receiver.get_id()
-    _emit(EventKind.PASS, actor.get_id(), receiver.get_id())
+    _emit(EventKind.KEEPER_RELEASE if actor.is_goalkeeper else EventKind.PASS, actor.get_id(), receiver.get_id())
+    events.back()["lob"] = command.lob_pass
 
 func _shoot(actor: IEGPlayerState, aim: Vector2, charge: float) -> void:
     charge = clampf(charge, 0.0, 1.0) if is_finite(charge) else 0.0
@@ -322,25 +350,33 @@ func _advance_ball() -> void:
             continue
         if player.recovery_time > 0.0:
             continue
-        var t: float = Rules.closest_segment_time(Rules.planar(before),
-            Rules.planar(next_position), player.position)
-        var point: Vector3 = before.lerp(next_position, t)
-        if point.y > 0.95 or Rules.planar(point).distance_to(player.position) > 0.64:
-            continue
+        var keeper_active: bool = player.is_goalkeeper and _in_keeper_area(player, Rules.planar(before))
+        var t: float = Rules.contact_time(before, next_position, player.position,
+            1.15 if keeper_active else 0.64, 2.5 if keeper_active else 0.95)
         if t < first_t:
             first = player
             first_t = t
     if first != null and first_t < goal_t:
-        ball.owner_id = first.get_id()
-        ball.mode = BallState.Mode.HELD
-        ball.velocity = Vector3.ZERO
-        first.possession_grace = DuelRules.POSSESSION_GRACE
-        _follow_owner()
-        var kicker: IEGPlayerState = get_player(_last_kicker)
-        var interception: bool = kicker != null and kicker.team_id != first.team_id
-        if first.team_id == LOCAL_TEAM:
-            controlled_id = first.get_id()
-        _emit(EventKind.INTERCEPTION if interception else EventKind.RECEPTION, first.get_id(), _last_kicker)
+        var contact: Vector3 = before.lerp(next_position, first_t)
+        if first.is_goalkeeper and _in_keeper_area(first, Rules.planar(contact)):
+            if velocity.length() <= 18.0 and contact.y <= 1.6:
+                _gain_possession(first)
+                _follow_owner()
+                _emit(EventKind.KEEPER_CAPTURE, first.get_id(), _last_kicker)
+            else:
+                # Déviation = ballon libre. Aucun changement de sélection.
+                var outward: Vector2 = Vector2(0.45 if contact.x >= first.position.x else -0.45,
+                    -1.0 if first.team_id == 0 else 1.0).normalized()
+                ball.position = Rules.on_ground(first.position + outward * 1.22, maxf(contact.y, Rules.BALL_RADIUS))
+                _release(first.get_id(), BallState.Mode.FREE,
+                    Rules.on_ground(outward * clampf(velocity.length() * 0.45, 5.0, 14.0), 2.2))
+                _emit(EventKind.KEEPER_DEFLECTION, first.get_id())
+        else:
+            _gain_possession(first)
+            _follow_owner()
+            var kicker: IEGPlayerState = get_player(_last_kicker)
+            var interception: bool = kicker != null and kicker.team_id != first.team_id
+            _emit(EventKind.INTERCEPTION if interception else EventKind.RECEPTION, first.get_id(), _last_kicker)
         return
     if is_finite(goal_t):
         goals += 1
@@ -386,6 +422,7 @@ func make_snapshot() -> Dictionary:
         states.append({"id": player.get_id(), "team_id": player.team_id,
             "tackle_cooldown": player.tackle_cooldown, "recovery_time": player.recovery_time,
             "possession_grace": player.possession_grace,
+            "is_goalkeeper": player.is_goalkeeper, "keeper_hold_time": player.keeper_hold_time,
             "position": [player.position.x, player.position.y],
             "velocity": [player.velocity.x, player.velocity.y],
             "facing": [player.facing.x, player.facing.y], "energy": player.energy})
@@ -394,3 +431,16 @@ func make_snapshot() -> Dictionary:
         "ball": {"owner_id": ball.owner_id, "mode": ball.mode,
             "position": [ball.position.x, ball.position.y, ball.position.z],
             "velocity": [ball.velocity.x, ball.velocity.y, ball.velocity.z]}}
+
+func _in_keeper_area(keeper: IEGPlayerState, point: Vector2) -> bool:
+    var side: float = 1.0 if keeper.team_id == 0 else -1.0
+    return absf(point.x) <= 4.5 and point.y * side >= 12.0 and point.y * side <= Rules.HALF_LENGTH + Rules.BALL_RADIUS
+
+func _gain_possession(player: IEGPlayerState) -> void:
+    ball.owner_id = player.get_id()
+    ball.mode = BallState.Mode.HELD
+    ball.velocity = Vector3.ZERO
+    player.possession_grace = DuelRules.POSSESSION_GRACE
+    player.keeper_hold_time = 0.0
+    if player.team_id == LOCAL_TEAM:
+        controlled_id = player.get_id()

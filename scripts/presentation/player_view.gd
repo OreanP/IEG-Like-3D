@@ -2,6 +2,7 @@ class_name IEGPlayerView
 extends Node3D
 ## L'état vient de la session. Remplacer le GLB ne change pas les règles du jeu.
 
+@export var is_goalkeeper: bool = false
 @export_enum("Alliés:0", "Adversaires:1") var team_id: int = 0
 @export var profile: IEGPlayerProfile
 @onready var visual_model: Node3D = $VisualModel
@@ -64,6 +65,7 @@ func sync_state(state: IEGPlayerState, selected: bool, pass_target: bool, delta:
     selection_ring.visible = selected
     target_ring.visible = pass_target
     number_label.modulate = Color("ffdd87") if selected else Color.WHITE
+    visual_model.rotation.z = lerpf(visual_model.rotation.z, 0.0, 1.0 - exp(-10.0 * delta))
     _kick_remaining = maxf(0.0, _kick_remaining - delta)
     if _kick_remaining > 0.0:
         return
@@ -92,3 +94,9 @@ func _play(clip: String) -> void:
         return
     _animations.play(_clips[clip], 0.12)
     _current = clip
+
+func represent_save(captured: bool) -> void:
+    # Réaction visuelle seulement. La capture/déviation est déjà décidée.
+    visual_model.rotation.z = 0.12 if captured else -0.28
+    if not captured:
+        kick()

@@ -78,7 +78,7 @@ func _build_pause() -> void:
     center.add_child(column)
     _text(column, "PAUSE", 42, Color("f5d691")).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     var description: Label = _text(column,
-        "Entraînement libre à trois joueurs\nPas encore d'adversaires ni de techniques spéciales.",
+        "Entraînement avec opposition et gardiens\nPremière base jouable — pas un match complet.",
         19, Color("b6c9d6"))
     description.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     _resume = _button(column, "Reprendre", func(): resume_requested.emit())
@@ -111,24 +111,28 @@ func refresh(delta: float, session: IEGTrainingSession, controls: IEGLocalPlayer
         _status.text = "Puissance du tir : %d %%" % roundi(controls.charge * 100.0)
     else:
         _status.text = "En possession  /  Endurance" if session.ball.owner_id == player.get_id() else "Sans ballon  /  Endurance"
+    if controls.pass_target_id >= 0:
+        _status.text += " / Cible n°%02d" % controls.pass_target_id
+    if player.is_goalkeeper and session.ball.owner_id == player.get_id():
+        _status.text = "Gardien : passe / lob pour relancer"
     if player.sprint_exhausted:
         _status.text += " — récupération"
     _energy.value = player.energy
     _charge.value = controls.charge
     _charge.visible = controls.charge > 0.0
-    _score.text = "%02d  BUT%s" % [session.goals, "S" if session.goals > 1 else ""]
+    _score.text = "%02d — %02d" % [session.team_goals[0], session.team_goals[1]]
     var pad_name: String = Input.get_joy_name(controls.last_gamepad) if controls.last_gamepad >= 0 else ""
     if controls.uses_gamepad:
         _device.text = "Manette : " + pad_name
         var ps: bool = (pad_name.to_lower().contains("sony")
             or pad_name.to_lower().contains("dual") or pad_name.to_lower().contains("playstation"))
         if ps:
-            _controls.text = "Croix : passe   Carré maintenu : tir\nL1 : joueur   R2 : sprint   R3 : recentrer\nStick droit : caméra   Haut/Bas : zoom\nOptions : pause   Create/Share : replacer"
+            _controls.text = "Croix : passe   Triangle : lob   Rond : tacle\nCarré : tir chargé   R1 : cible   L1 : joueur\nR2 : sprint   R3 : recentrer   Stick droit : caméra\nOptions : pause   Create/Share : replacer"
         else:
-            _controls.text = "A : passe   X maintenu : tir\nLB : joueur   RT : sprint   R3 : recentrer\nStick droit : caméra   Haut/Bas : zoom\nStart : pause   View/Back : replacer"
+            _controls.text = "A : passe   Y : lob   B : tacle\nX : tir chargé   RB : cible   LB : joueur\nRT : sprint   R3 : recentrer   Stick droit : caméra\nStart : pause   View/Back : replacer"
     else:
         _device.text = "Clavier / souris · manette utilisable à tout moment"
-        _controls.text = "ZQSD / WASD : bouger   Maj : sprint\nEspace : passe   Clic gauche / F : tir chargé\nTab : joueur   Clic droit glissé : caméra\nMolette : zoom   C : recentrer   R : replacer"
+        _controls.text = "ZQSD / WASD : bouger   Maj : sprint\nEspace : passe   G : lob   E : tacle   Q : cible\nTab : joueur   Clic gauche / F : tir chargé\nClic droit : caméra   Molette : zoom   C : recentrer   R : replacer"
     _message_life = maxf(0.0, _message_life - delta)
     _message.visible = _message_life > 0.0
 

@@ -55,3 +55,29 @@ static func goal_crossing_time(start: Vector3, finish: Vector3) -> float:
 
 static func crosses_goal(start: Vector3, finish: Vector3) -> bool:
     return is_finite(goal_crossing_time(start, finish))
+
+static func contact_time(start: Vector3, finish: Vector3, center: Vector2,
+        radius: float, max_height: float) -> float:
+    # Premier contact dans un cylindre, pas le point le plus proche : évite le
+    # tunneling et respecte l'ordre réception/arrêt/franchissement de la ligne.
+    var a: Vector2 = planar(start) - center
+    var d: Vector2 = planar(finish - start)
+    var enter: float = 0.0
+    var leave: float = 1.0
+    if d.length_squared() > 0.000001:
+        var b: float = a.dot(d)
+        var discriminant: float = b * b - d.length_squared() * (a.length_squared() - radius * radius)
+        if discriminant < 0.0:
+            return INF
+        enter = maxf(0.0, (-b - sqrt(discriminant)) / d.length_squared())
+        leave = minf(1.0, (-b + sqrt(discriminant)) / d.length_squared())
+    elif a.length() > radius:
+        return INF
+    var dy: float = finish.y - start.y
+    if dy < -0.000001:
+        enter = maxf(enter, (max_height - start.y) / dy)
+    elif dy > 0.000001:
+        leave = minf(leave, (max_height - start.y) / dy)
+    elif start.y > max_height:
+        return INF
+    return enter if enter <= leave and enter <= 1.0 and leave >= 0.0 else INF

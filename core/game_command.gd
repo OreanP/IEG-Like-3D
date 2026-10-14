@@ -4,6 +4,8 @@ extends RefCounted
 
 var move: Vector2 = Vector2.ZERO
 var aim: Vector2 = Vector2(0.0, -1.0)
+var pass_target_id: int = -1
+var lob_pass: bool = false
 var tackle: bool = false
 var sprint: bool = false
 var pass_ball: bool = false
@@ -15,7 +17,7 @@ var reset_drill: bool = false
 func to_dict() -> Dictionary:
     return {
         "move": [move.x, move.y], "aim": [aim.x, aim.y],
-        "tackle": tackle, "sprint": sprint, "pass_ball": pass_ball, "shoot": shoot,
+        "pass_target_id": pass_target_id, "lob_pass": lob_pass, "tackle": tackle, "sprint": sprint, "pass_ball": pass_ball, "shoot": shoot,
         "shot_charge": shot_charge, "switch_player": switch_player,
         "reset_drill": reset_drill,
     }
@@ -24,6 +26,11 @@ static func from_dict(data: Dictionary) -> IEGGameCommand:
     var command: IEGGameCommand = IEGGameCommand.new()
     command.move = _read_vector(data.get("move", null), Vector2.ZERO)
     command.aim = _read_vector(data.get("aim", null), Vector2(0.0, -1.0))
+    var target: Variant = data.get("pass_target_id", -1)
+    if (target is int or target is float) and is_finite(float(target)):
+        if float(target) == floor(float(target)) and float(target) >= -1.0 and float(target) <= 1000000.0:
+            command.pass_target_id = int(target)
+    command.lob_pass = data.get("lob_pass", false) == true
     command.tackle = data.get("tackle", false) == true
     command.sprint = data.get("sprint", false) == true
     command.pass_ball = data.get("pass_ball", false) == true
