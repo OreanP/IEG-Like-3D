@@ -27,6 +27,7 @@ var _next_kickoff_team: int = 0
 var _initialized: bool = false
 var _shot_technique: String = ""
 var _shot_charge: float = 0.0
+var _sprinting: Dictionary = {}
 
 func _init(profiles: Array[IEGPlayerProfile] = [], starts: Array[Vector2] = [],
         teams: Array[int] = [], keeper_roles: Array[bool] = [], half_seconds: float = 300.0) -> void:
@@ -115,6 +116,18 @@ func start_second_half(new_formations: Dictionary = {}) -> bool:
         player.dazed_time = 0.0
         player.keeper_stamina = minf(100.0, player.keeper_stamina + 20.0)
         player.energy = minf(100.0, player.energy + 20.0)
+        player.resonance_used_period = 0
+        player.karma_reserves.clear()
+        var karma: Dictionary = player.modifiers.get("KARMA", {})
+        if karma.has("pg"):
+            var properties: Dictionary = catalog.get_definition(String(karma["id"])).get("properties", {})
+            karma["pg_max"] = float(properties.get("pg_max", karma["pg_max"]))
+            karma["pe_max"] = float(properties.get("pe_max", karma["pe_max"]))
+            karma["pg"] = float(karma["pg_max"])
+            karma["pe"] = float(karma["pe_max"])
+            karma["energy"] = float(karma["pe"])
+            karma["energy_max"] = float(karma["pe_max"])
+            _store_karma_reserves(player, karma)
     phase = Phase.LIVE
     duel.clear()
     _reset_positions()
@@ -158,7 +171,11 @@ func choose_duel(choice: String, technique_id: String = "") -> bool:
     var is_attack: bool = duel["local_role"] == "attack"
     var local_actor: IEGPlayerState = attacker if is_attack else defender
     var category: String = ("TIR" if is_attack else "GAR") if duel["kind"] == "keeper" else (("TIR" if is_attack else "DEF") if duel["kind"] == "block" else ("ATT" if is_attack else "DEF"))
-    var prepaid: bool = is_attack and not technique_id.is_empty() and technique_id == String(duel.get("prepaid_technique", ""))
+    var prepaid_id: String = String(duel.get("prepaid_technique", ""))
+    var prepaid_shot: bool = bool(duel.get("shot_chain", false))
+    var prepaid: bool = is_attack and not technique_id.is_empty() and technique_id == prepaid_id
+    if is_attack and prepaid_shot and choice == "special" and (prepaid_id.is_empty() or technique_id != prepaid_id):
+        return false
     if choice == "special" and not prepaid and not _technique_available(local_actor, technique_id, category):
         return false
     if choice != "special" and not technique_id.is_empty():
@@ -167,6 +184,8 @@ func choose_duel(choice: String, technique_id: String = "") -> bool:
     var defense_choice: String = String(duel["ai_choice"]) if is_attack else choice
     var attack_tech: String = technique_id if is_attack and choice == "special" else ""
     var defense_tech: String = technique_id if not is_attack and choice == "special" else ""
+    if not prepaid_id.is_empty():
+        attack_tech = prepaid_id
     var chosen_attack_technique: String = attack_tech if is_attack else String(duel.get("prepaid_technique", ""))
     if duel["kind"] in ["keeper", "block"] and attacker.position.distance_to(attacking_goal(attacker.team_id)) > shot_range(attacker, chosen_attack_technique):
         return false
@@ -178,14 +197,27 @@ func choose_duel(choice: String, technique_id: String = "") -> bool:
             defense_choice = "special"
             defense_tech = ai_tech
         else:
-            attack_choice = "special"
-            attack_tech = ai_tech
+            if not prepaid_shot:
+                attack_choice = "special"
+                attack_tech = ai_tech
+    # Les bonus de l'invocation participent au duel même si son paiement l'épuise.
+    var attack_stat: String = "shot" if duel["kind"] in ["keeper", "block"] else "dribble"
+    var defense_stat: String = "keeper" if defender.is_goalkeeper else "defense"
+    var attack_bonus: float = _modifier_bonus(attacker, attack_stat)
+    var defense_bonus: float = _modifier_bonus(defender, defense_stat)
+    if bool(duel.get("shot_chain", false)):
+        attack_bonus = float(duel.get("prepaid_attack_bonus", attack_bonus))
+    var attack_karma_id: String = String(attacker.modifiers.get("KARMA", {}).get("id", ""))
+    if not attacker.modifiers.get("KARMA", {}).has("pg"):
+        attack_karma_id = ""
+    if prepaid_shot:
+        attack_karma_id = String(duel.get("prepaid_karma_id", attack_karma_id))
     # Dépenser seulement après validation de l'ensemble de la décision locale.
     if not attack_tech.is_empty() and attack_tech != String(duel.get("prepaid_technique", "")):
         _pay_technique(attacker, attack_tech)
     _pay_technique(defender, defense_tech)
-    var attack_score: float = 42.0 + attacker.energy * 0.24 + _modifier_bonus(attacker)
-    var defense_score: float = 43.0 + (defender.keeper_stamina if defender.is_goalkeeper else defender.energy) * 0.24 + _modifier_bonus(defender)
+    var attack_score: float = 42.0 + attacker.energy * 0.24 + attack_bonus
+    var defense_score: float = 43.0 + (defender.keeper_stamina if defender.is_goalkeeper else defender.energy) * 0.24 + defense_bonus
     if duel["kind"] in ["keeper", "block"]:
         attack_score += float(duel["shot_charge"]) * 13.0
         attack_score -= maxf(0.0, attacker.position.distance_to(attacking_goal(attacker.team_id)) - 24.0) * 0.5
@@ -194,7 +226,15 @@ func choose_duel(choice: String, technique_id: String = "") -> bool:
     elif attack_choice != "special" and defense_choice != "special":
         attack_score += 16.0
     if not attack_tech.is_empty():
-        attack_score += float(catalog.get_definition(attack_tech).get("power", 0.0))
+        var attack_definition: Dictionary = catalog.get_definition(attack_tech)
+        attack_score += float(attack_definition.get("power", 0.0))
+        if duel["kind"] in ["keeper", "block"]:
+            var shot_properties: Dictionary = attack_definition.get("properties", {})
+            var distance: float = attacker.position.distance_to(attacking_goal(attacker.team_id))
+            var optimal_min: float = float(shot_properties.get("optimal_min", 0.0))
+            var optimal_max: float = float(shot_properties.get("optimal_max", INF))
+            var outside_optimal: float = maxf(0.0, optimal_min - distance) + maxf(0.0, distance - optimal_max)
+            attack_score -= outside_optimal * float(shot_properties.get("distance_falloff", 0.0))
     if not defense_tech.is_empty():
         defense_score += float(catalog.get_definition(defense_tech).get("power", 0.0))
     if defender.is_goalkeeper:
@@ -203,15 +243,18 @@ func choose_duel(choice: String, technique_id: String = "") -> bool:
         defender.energy = maxf(0.0, defender.energy - 4.0)
     attacker.energy = maxf(0.0, attacker.energy - 4.0)
     var won: bool = attack_score > defense_score
+    _pay_karma_duel(attacker, attack_tech, won, prepaid_shot, attack_karma_id)
+    _pay_karma_duel(defender, defense_tech, not won)
     var outcome: String = "dribble" if won else "tackle"
     if duel["kind"] == "block":
         outcome = "shot_continues" if won else "block"
     if duel["kind"] == "keeper":
-        outcome = "goal" if won else ("capture" if defense_score - attack_score >= 8.0 or defense_choice == "special" else "deflection")
+        outcome = "goal" if won else ("capture" if defense_score - attack_score >= 8.0 else "deflection")
     duel.merge({"attack_choice": attack_choice, "defend_choice": defense_choice,
         "attack_technique": attack_tech, "defend_technique": defense_tech,
         "attack_score": snappedf(attack_score, 0.1), "defend_score": snappedf(defense_score, 0.1),
         "winner_id": attacker.get_id() if won else defender.get_id(), "attacker_won": won,
+        "attack_bonus": attack_bonus, "attack_karma_id": attack_karma_id,
         "outcome": outcome, "result": "parry" if outcome == "deflection" else outcome}, true)
     var cinematic_duration: float = 0.0
     for id: String in [attack_tech, defense_tech]:
@@ -270,12 +313,17 @@ func _finish_duel() -> void:
     duel["applied"] = true
     if duel["outcome"] == "shot_continues":
         var paid_technique: String = String(duel["attack_technique"])
+        var paid_bonus: float = float(duel.get("attack_bonus", 0.0))
+        var paid_karma: String = String(duel.get("attack_karma_id", ""))
         _shot_technique = paid_technique
         _shot_charge = float(duel["shot_charge"]) * 0.8
         _duel_cooldown = 0.0
         var keeper: IEGPlayerState = keeper_for_team(defender.team_id)
         if keeper != null and request_duel(attacker.get_id(), keeper.get_id(), "keeper"):
             duel["prepaid_technique"] = paid_technique
+            duel["shot_chain"] = true
+            duel["prepaid_attack_bonus"] = paid_bonus
+            duel["prepaid_karma_id"] = paid_karma
 
 func _follow_owner_if_held() -> void:
     if ball.owner_id >= 0:
@@ -309,17 +357,20 @@ func _commands_for_tick(local_command: IEGGameCommand, ai_commands: Dictionary) 
 
 func _advance_players(commands: Dictionary) -> void:
     var frozen: Dictionary = {}
+    _sprinting.clear()
     for player: IEGPlayerState in players:
+        var movement: IEGGameCommand = commands.get(player.get_id(), Command.new())
+        _sprinting[player.get_id()] = movement.sprint and movement.move.length_squared() > 0.01 and not player.sprint_exhausted and player.recovery_time <= 0.0 and player.dazed_time <= 0.0
         player.speed_multiplier = 1.0
         # Les pondérations de profil et le bonus de Karma se composent.
         for modifier: Dictionary in get_active_modifiers(player.get_id()):
             var definition: Dictionary = catalog.get_definition(String(modifier["id"]))
-            if modifier["category"] == "RESONANCE":
+            if modifier["category"] == "RESONANCE" and not definition.get("properties", {}).has("donor_key"):
                 var partner: IEGPlayerState = get_player(int(modifier.get("partner_id", -1)))
                 if partner != null:
                     var blend: float = float(definition.get("properties", {}).get("blend", 0.5))
                     player.speed_multiplier *= lerpf(player.profile.run_speed, partner.profile.run_speed, blend) / player.profile.run_speed
-            elif modifier["category"] == "KARMA":
+            elif modifier["category"] == "KARMA" and not definition.get("properties", {}).has("pg_max"):
                 player.speed_multiplier *= 1.08
         if player.dazed_time > 0.0:
             frozen[player.get_id()] = player.position
@@ -398,7 +449,7 @@ func _reset_positions() -> void:
     var saved: Dictionary = {}
     if _initialized:
         for player: IEGPlayerState in players:
-            saved[player.get_id()] = [player.energy, player.keeper_stamina, player.modifiers.duplicate(true)]
+            saved[player.get_id()] = [player.energy, player.keeper_stamina, player.modifiers.duplicate(true), player.karma_reserves.duplicate(true), player.resonance_used_period]
     super._reset_positions()
     for player: IEGPlayerState in players:
         player.facing = Vector2(0.0, attack_direction(player.team_id))
@@ -407,6 +458,8 @@ func _reset_positions() -> void:
             player.energy = float(state[0])
             player.keeper_stamina = float(state[1])
             player.modifiers = state[2].duplicate(true)
+            player.karma_reserves = state[3].duplicate(true)
+            player.resonance_used_period = int(state[4])
     var kicker: IEGPlayerState = null
     for player: IEGPlayerState in players:
         if player.team_id == _next_kickoff_team and not player.is_goalkeeper:
@@ -423,34 +476,118 @@ func _reset_positions() -> void:
         _duel_cooldown = 1.2
     _follow_owner_if_held()
 
-func _technique_available(actor: IEGPlayerState, id: String, category: String) -> bool:
-    var definition: Dictionary = catalog.get_definition(id)
-    if definition.is_empty() or definition.get("category", "") != category:
+func get_available_techniques(player_id: int, category: String = "") -> Array[Dictionary]:
+    var result: Array[Dictionary] = []
+    var player: IEGPlayerState = get_player(player_id)
+    if player == null:
+        return result
+    var inherited: Array = []
+    var resonance: Dictionary = player.modifiers.get("RESONANCE", {})
+    if _modifier_is_active(resonance):
+        inherited = resonance.get("techniques", [])
+    for definition: Dictionary in catalog.all_definitions():
+        var family: String = String(definition.get("category", ""))
+        if family not in ["TIR", "ATT", "DEF", "GAR"] or (not category.is_empty() and family != category):
+            continue
+        if family == "GAR" and not player.is_goalkeeper:
+            continue
+        var id: String = String(definition["id"])
+        var karma_id: String = String(definition.get("properties", {}).get("karma_id", ""))
+        if not karma_id.is_empty():
+            var karma: Dictionary = player.modifiers.get("KARMA", {})
+            if not _modifier_is_active(karma) or String(karma.get("id", "")) != karma_id:
+                continue
+        elif not player.profile.technique_ids.is_empty() and id not in player.profile.technique_ids and id not in inherited:
+            continue
+        result.append(definition)
+    return result
+
+func can_use_technique(player_id: int, id: String, category: String = "") -> bool:
+    var player: IEGPlayerState = get_player(player_id)
+    if player == null or player.dazed_time > 0.0:
         return false
-    var reserve: float = actor.keeper_stamina if actor.is_goalkeeper else actor.energy
-    return reserve >= float(definition.get("cost", 0.0)) and actor.dazed_time <= 0.0
+    var definition: Dictionary = catalog.get_definition(id)
+    if definition.is_empty() or (not category.is_empty() and String(definition.get("category", "")) != category):
+        return false
+    var known: bool = false
+    for available: Dictionary in get_available_techniques(player_id, category):
+        if available["id"] == definition["id"]:
+            known = true
+            break
+    if not known:
+        return false
+    var properties: Dictionary = definition.get("properties", {})
+    if properties.has("karma_id"):
+        var karma: Dictionary = player.modifiers.get("KARMA", {})
+        return float(karma.get("pg", 0.0)) >= float(properties.get("pg_cost", 0.0)) and float(karma.get("pe", 0.0)) >= float(properties.get("pe_cost", 0.0))
+    var reserve: float = player.keeper_stamina if player.is_goalkeeper else player.energy
+    return reserve >= float(definition.get("cost", 0.0))
+
+func _technique_available(actor: IEGPlayerState, id: String, category: String) -> bool:
+    return actor != null and can_use_technique(actor.get_id(), id, category)
 
 func _pay_technique(actor: IEGPlayerState, id: String) -> void:
     if id.is_empty():
         return
-    var cost: float = float(catalog.get_definition(id).get("cost", 0.0))
+    var technique: Dictionary = catalog.get_definition(id)
+    # La signature possède son coût PG/PE, débité avec le résultat du duel.
+    if technique.get("properties", {}).has("karma_id"):
+        return
+    var cost: float = float(technique.get("cost", 0.0))
     if actor.is_goalkeeper:
         actor.keeper_stamina = maxf(0.0, actor.keeper_stamina - cost)
     else:
         actor.energy = maxf(0.0, actor.energy - cost)
-    # Chaque famille ne débite que sa propre réserve, même lorsqu'elles se cumulent.
+    # Compatibilité des anciennes fiches à réserve unique.
     for category: String in MODIFIER_CATEGORIES:
         var state: Dictionary = actor.modifiers.get(category, {})
-        if not _modifier_is_active(state):
+        if not _modifier_is_active(state) or state.has("pg"):
             continue
         var definition: Dictionary = catalog.get_definition(String(state["id"]))
         var extra: float = float(definition.get("properties", {}).get("technique_energy_cost", 0.0))
         state["energy"] = maxf(0.0, float(state["energy"]) - extra)
         if float(state["energy"]) <= 0.0:
-            actor.modifiers.erase(category)
+            deactivate_modifier(actor.get_id(), category)
+
+func _pay_karma_duel(actor: IEGPlayerState, technique_id: String, won: bool, prepaid: bool = false, prepaid_karma_id: String = "") -> void:
+    if prepaid and not prepaid_karma_id.is_empty():
+        # Le tir poursuit sa route même si son invocation a épuisé ses PE au blocage.
+        if not won and actor.karma_reserves.has(prepaid_karma_id):
+            var reserve: Dictionary = actor.karma_reserves[prepaid_karma_id]
+            var properties: Dictionary = catalog.get_definition(prepaid_karma_id).get("properties", {})
+            reserve["pg"] = maxf(0.0, float(reserve["pg"]) - float(properties.get("defeat_pg_cost", 20.0)))
+            var active: Dictionary = actor.modifiers.get("KARMA", {})
+            if String(active.get("id", "")) == prepaid_karma_id:
+                active["pg"] = float(reserve["pg"])
+                if not _modifier_is_active(active):
+                    actor.modifiers.erase("KARMA")
+        return
+    var karma: Dictionary = actor.modifiers.get("KARMA", {})
+    if not _modifier_is_active(karma) or not karma.has("pg"):
+        return
+    var properties: Dictionary = catalog.get_definition(String(karma["id"])).get("properties", {})
+    var technique: Dictionary = catalog.get_definition(technique_id).get("properties", {})
+    var signature: bool = String(technique.get("karma_id", "")) == String(karma["id"])
+    var pg_cost: float = float(technique.get("pg_cost", 0.0)) if signature else float(properties.get("duel_pg_cost", 10.0))
+    var pe_cost: float = float(technique.get("pe_cost", 0.0)) if signature else float(properties.get("duel_pe_cost", 4.0))
+    if prepaid:
+        pg_cost = 0.0
+        pe_cost = 0.0
+    if not won:
+        pg_cost += float(properties.get("defeat_pg_cost", 20.0))
+    karma["pg"] = maxf(0.0, float(karma["pg"]) - pg_cost)
+    karma["pe"] = maxf(0.0, float(karma["pe"]) - pe_cost)
+    karma["energy"] = float(karma["pe"])
+    _store_karma_reserves(actor, karma)
+    if not _modifier_is_active(karma):
+        actor.modifiers.erase("KARMA")
+
+func _store_karma_reserves(player: IEGPlayerState, karma: Dictionary) -> void:
+    if karma.has("pg"):
+        player.karma_reserves[String(karma["id"])] = {"pg": float(karma["pg"]), "pe": float(karma["pe"])}
 
 func _affordable_ai_technique(actor: IEGPlayerState, category: String) -> String:
-    var definitions: Array[Dictionary] = catalog.definitions_for(category)
+    var definitions: Array[Dictionary] = get_available_techniques(actor.get_id(), category)
     if definitions.is_empty():
         return ""
     var offset: int = _duel_count % definitions.size()
@@ -470,10 +607,46 @@ func set_tactic(team: int, id: String) -> bool:
     tactic_time[team] = float(definition.get("duration", 30.0))
     return true
 
+func get_available_modifiers(player_id: int, category: String) -> Array[Dictionary]:
+    var result: Array[Dictionary] = []
+    var player: IEGPlayerState = get_player(player_id)
+    if player == null or player.team_id != LOCAL_TEAM or category not in MODIFIER_CATEGORIES:
+        return result
+    for definition: Dictionary in catalog.definitions_for(category):
+        var properties: Dictionary = definition.get("properties", {})
+        if category == "KARMA" and properties.has("pg_max") and not _owns_karma(player, String(definition["id"])):
+            continue
+        if category == "RESONANCE" and properties.has("donor_key"):
+            var donor: IEGPlayerState = _find_donor(player, String(properties["donor_key"]))
+            if donor == null:
+                continue
+            definition["partner_id"] = donor.get_id()
+        result.append(definition)
+    return result
+
+func _find_donor(player: IEGPlayerState, donor_key: String) -> IEGPlayerState:
+    for candidate: IEGPlayerState in players:
+        if candidate != player and candidate.team_id == player.team_id and candidate.profile.content_key == donor_key:
+            return candidate
+    return null
+
+func _owns_karma(player: IEGPlayerState, karma_id: String) -> bool:
+    if _profile_owns_karma(player, karma_id):
+        return true
+    var resonance: Dictionary = player.modifiers.get("RESONANCE", {})
+    if not _modifier_is_active(resonance):
+        return false
+    var donor: IEGPlayerState = get_player(int(resonance.get("partner_id", -1)))
+    return String(resonance.get("inherited_karma_id", "")) == karma_id and donor != null and donor.team_id == player.team_id and _profile_owns_karma(donor, karma_id)
+
+func _profile_owns_karma(player: IEGPlayerState, karma_id: String) -> bool:
+    var properties: Dictionary = catalog.get_definition(karma_id).get("properties", {})
+    return karma_id in player.profile.karma_ids or (not player.profile.content_key.is_empty() and player.profile.content_key in properties.get("owner_keys", []))
+
 func activate_modifier(player_id: int, content_id: String, partner_id: int = -1) -> bool:
     modifier_error = ""
     var player: IEGPlayerState = get_player(player_id)
-    if phase != Phase.LIVE:
+    if phase != Phase.LIVE or is_resetting():
         return _reject_modifier("Les augmentations s'activent pendant le jeu live.")
     if player == null or player.team_id != LOCAL_TEAM:
         return _reject_modifier("Choisissez un joueur de votre équipe.")
@@ -490,17 +663,69 @@ func activate_modifier(player_id: int, content_id: String, partner_id: int = -1)
     var cost: float = float(definition.get("cost", 0.0))
     if player.energy < cost:
         return _reject_modifier("Endurance insuffisante pour cette activation.")
+    var properties: Dictionary = definition.get("properties", {})
+    var partner: IEGPlayerState = null
+    if category == "KARMA" and properties.has("pg_max") and not _owns_karma(player, String(definition["id"])):
+        return _reject_modifier("Ce joueur ne possède pas ce Karma, personnellement ou par Resonance.")
     if category == "RESONANCE":
-        var partner: IEGPlayerState = get_player(partner_id)
+        if properties.has("donor_key"):
+            if player.resonance_used_period == period:
+                return _reject_modifier("Une seule activation de Resonance par joueur et par mi-temps.")
+            if partner_id < 0:
+                partner = _find_donor(player, String(properties["donor_key"]))
+                partner_id = partner.get_id() if partner != null else -1
+        partner = get_player(partner_id)
         if partner == null or partner == player or partner.team_id != player.team_id or partner.dazed_time > 0.0:
             return _reject_modifier("Choisissez un partenaire allié valide pour la Resonance.")
-    var properties: Dictionary = definition.get("properties", {})
+        if properties.has("donor_key"):
+            if partner.profile.content_key != String(properties["donor_key"]):
+                return _reject_modifier("Cette Resonance exige le donneur indiqué sur sa fiche.")
+            for other: IEGPlayerState in players:
+                var active: Dictionary = other.modifiers.get("RESONANCE", {})
+                if _modifier_is_active(active) and int(active.get("partner_id", -1)) == partner_id:
+                    return _reject_modifier("Ce donneur alimente déjà une Resonance active.")
     var reserve: float = float(properties.get("energy_max", 100.0))
-    # Toutes les validations précèdent la dépense et la création d'état.
-    player.energy -= cost
-    player.modifiers[category] = {"id": String(definition["id"]),
+    var state: Dictionary = {"id": String(definition["id"]),
         "time": float(definition.get("duration", 20.0)), "energy": reserve,
         "energy_max": reserve, "partner_id": partner_id if category == "RESONANCE" else -1}
+    if category == "KARMA" and properties.has("pg_max"):
+        var saved: Dictionary = player.karma_reserves.get(String(definition["id"]), {})
+        state["pg_max"] = float(properties["pg_max"])
+        state["pe_max"] = float(properties["pe_max"])
+        state["pg"] = minf(float(saved.get("pg", state["pg_max"])), float(state["pg_max"]))
+        state["pe"] = minf(float(saved.get("pe", state["pe_max"])), float(state["pe_max"]))
+        if float(state["pg"]) <= 0.0 or float(state["pe"]) <= 0.0:
+            return _reject_modifier("Ce Karma est épuisé jusqu'à la mi-temps.")
+        state["energy"] = float(state["pe"])
+        state["energy_max"] = float(state["pe_max"])
+        state["time"] = float(state["pe"]) / maxf(0.001, float(properties.get("pe_drain", 1.0)))
+        state["inherited_from"] = not _profile_owns_karma(player, String(definition["id"]))
+        state["inherited_from_id"] = int(player.modifiers.get("RESONANCE", {}).get("partner_id", -1)) if bool(state["inherited_from"]) else -1
+        _store_karma_reserves(player, state)
+    elif category == "RESONANCE" and properties.has("donor_key"):
+        state["energy_max"] = float(state["time"])
+        state["energy"] = float(state["time"])
+        state["techniques"] = properties.get("inherited_techniques", []).duplicate()
+        var inherited_karma: String = String(properties.get("inherited_karma_id", ""))
+        state["inherited_karma_id"] = inherited_karma if _profile_owns_karma(partner, inherited_karma) else ""
+        player.resonance_used_period = period
+    # Toutes les validations précèdent la dépense et la création d'état.
+    player.energy -= cost
+    player.modifiers[category] = state
+    return true
+
+func deactivate_modifier(player_id: int, category: String) -> bool:
+    var player: IEGPlayerState = get_player(player_id)
+    if player == null or not player.modifiers.has(category):
+        return false
+    var state: Dictionary = player.modifiers[category]
+    if category == "KARMA":
+        _store_karma_reserves(player, state)
+    player.modifiers.erase(category)
+    if category == "RESONANCE":
+        var karma: Dictionary = player.modifiers.get("KARMA", {})
+        if bool(karma.get("inherited_from", false)):
+            deactivate_modifier(player_id, "KARMA")
     return true
 
 func _reject_modifier(reason: String) -> bool:
@@ -508,6 +733,8 @@ func _reject_modifier(reason: String) -> bool:
     return false
 
 func _modifier_is_active(state: Dictionary) -> bool:
+    if state.has("pg"):
+        return float(state.get("pg", 0.0)) > 0.0000001 and float(state.get("pe", 0.0)) > 0.0000001
     return not state.is_empty() and float(state.get("time", 0.0)) > 0.0000001 and float(state.get("energy", 0.0)) > 0.0000001
 
 func get_active_modifiers(player_id: int) -> Array[Dictionary]:
@@ -534,15 +761,42 @@ func count_active_modifiers(team: int, category: String) -> int:
             count += 1
     return count
 
-func _modifier_bonus(player: IEGPlayerState) -> float:
+func get_stat_bonuses(player_id: int) -> Dictionary:
+    var result: Dictionary = {"shot": 0.0, "dribble": 0.0, "technique": 0.0, "defense": 0.0, "keeper": 0.0}
+    var player: IEGPlayerState = get_player(player_id)
+    if player == null:
+        return result
+    for modifier: Dictionary in get_active_modifiers(player_id):
+        var properties: Dictionary = catalog.get_definition(String(modifier["id"])).get("properties", {})
+        if modifier["category"] == "KARMA":
+            var bonuses: Dictionary = properties.get("stat_bonuses", {})
+            for key: String in result:
+                result[key] = float(result[key]) + float(bonuses.get(key, 0.0))
+        elif properties.has("donor_key"):
+            var donor: IEGPlayerState = get_player(int(modifier.get("partner_id", -1)))
+            if donor != null:
+                for key: String in properties.get("stat_keys", []):
+                    if result.has(key):
+                        # Uniquement les statistiques de base, jamais ses bonus temporaires.
+                        result[key] = float(result[key]) + float(donor.profile.base_stats.get(key, 0.0)) * float(properties.get("blend", 0.2))
+    return result
+
+func _modifier_bonus(player: IEGPlayerState, stat: String = "") -> float:
     var bonus: float = 0.0
+    var stats: Dictionary = get_stat_bonuses(player.get_id())
+    if not stat.is_empty():
+        bonus += float(stats.get(stat, 0.0))
+        bonus += float(stats.get("technique", 0.0)) * 0.25
     for modifier: Dictionary in get_active_modifiers(player.get_id()):
         var definition: Dictionary = catalog.get_definition(String(modifier["id"]))
+        var properties: Dictionary = definition.get("properties", {})
+        if properties.has("pg_max") or properties.has("donor_key"):
+            continue
         bonus += float(definition.get("power", 0.0))
         if modifier["category"] == "RESONANCE":
             var partner: IEGPlayerState = get_player(int(modifier.get("partner_id", -1)))
             if partner != null:
-                bonus += partner.energy * float(definition.get("properties", {}).get("blend", 0.5)) * 0.1
+                bonus += partner.energy * float(properties.get("blend", 0.5)) * 0.1
     return bonus
 
 func _advance_modifiers() -> void:
@@ -556,10 +810,23 @@ func _advance_modifiers() -> void:
             if state.is_empty():
                 continue
             var definition: Dictionary = catalog.get_definition(String(state["id"]))
-            state["time"] = maxf(0.0, float(state["time"]) - Rules.TICK)
-            state["energy"] = maxf(0.0, float(state["energy"]) - float(definition.get("properties", {}).get("energy_drain", 1.0)) * Rules.TICK)
+            var properties: Dictionary = definition.get("properties", {})
+            if state.has("pg"):
+                var drain: float = float(properties.get("pe_drain", 1.0))
+                if bool(_sprinting.get(player.get_id(), false)):
+                    drain += float(properties.get("sprint_pe_drain", 1.0))
+                state["pe"] = maxf(0.0, float(state["pe"]) - drain * Rules.TICK)
+                state["energy"] = float(state["pe"])
+                state["time"] = float(state["pe"]) / maxf(0.001, float(properties.get("pe_drain", 1.0)))
+                _store_karma_reserves(player, state)
+            else:
+                state["time"] = maxf(0.0, float(state["time"]) - Rules.TICK)
+                if properties.has("donor_key"):
+                    state["energy"] = float(state["time"])
+                else:
+                    state["energy"] = maxf(0.0, float(state["energy"]) - float(properties.get("energy_drain", 1.0)) * Rules.TICK)
             if not _modifier_is_active(state):
-                player.modifiers.erase(category)
+                deactivate_modifier(player.get_id(), category)
 
 func build_ai_commands() -> Dictionary:
     var commands: Dictionary = {}
@@ -618,7 +885,10 @@ func make_snapshot() -> Dictionary:
     for index: int in range(players.size()):
         var player: IEGPlayerState = players[index]
         snapshot["players"][index].merge({"dazed_time": player.dazed_time,
-            "keeper_stamina": player.keeper_stamina, "modifiers": player.modifiers.duplicate(true)}, true)
+            "keeper_stamina": player.keeper_stamina, "modifiers": player.modifiers.duplicate(true),
+            "karma_reserves": player.karma_reserves.duplicate(true),
+            "resonance_used_period": player.resonance_used_period,
+            "stat_bonuses": get_stat_bonuses(player.get_id())}, true)
     return snapshot
 
 func _shot_blocker(shooter: IEGPlayerState) -> IEGPlayerState:

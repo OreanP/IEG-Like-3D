@@ -4,6 +4,12 @@ extends Resource
 
 @export var player_id: int = 7
 @export var display_name: String = "Joueur 07"
+## Identité de contenu stable, distincte du numéro et du nom affiché.
+@export var content_key: String = ""
+@export var base_stats: Dictionary = {"shot": 50.0, "dribble": 50.0, "technique": 50.0, "defense": 50.0, "keeper": 50.0}
+## Une liste vide conserve les profils d'entraînement historiques : techniques ordinaires libres.
+@export var technique_ids: Array[String] = []
+@export var karma_ids: Array[String] = []
 @export_range(1, 99, 1) var shirt_number: int = 7
 @export_range(1.0, 12.0, 0.1) var run_speed: float = 5.2
 @export_range(1.0, 16.0, 0.1) var sprint_speed: float = 8.2

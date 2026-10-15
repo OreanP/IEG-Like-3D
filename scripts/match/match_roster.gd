@@ -27,6 +27,25 @@ static func build() -> Dictionary:
             profile.player_id = shirt + team * 20
             profile.shirt_number = shirt
             profile.display_name = "%s %02d" % ["Azur" if team == 0 else "Carmin", shirt]
+            profile.content_key = "%s_%02d" % ["azur" if team == 0 else "carmin", shirt]
+            if index >= 5:
+                profile.technique_ids = ["orbital_shot", "combat_blade"]
+            else:
+                profile.technique_ids = ["hurricane_barrier", "aquablast"]
+            if index == 0:
+                profile.technique_ids = ["photo_stop"]
+            if team == 0 and shirt == 7:
+                profile.display_name = "Soren Vale"
+                profile.content_key = "soren_vale"
+                profile.base_stats = {"shot": 90.0, "dribble": 80.0, "technique": 85.0, "defense": 45.0, "keeper": 20.0}
+                profile.technique_ids = ["drift", "magnus_shot", "orbital_shot", "combat_blade"]
+                profile.karma_ids = ["astreion"]
+            elif team == 0 and shirt == 1:
+                profile.display_name = "Maëlle Néris"
+                profile.content_key = "maelle_neris"
+                profile.base_stats = {"shot": 30.0, "dribble": 45.0, "technique": 80.0, "defense": 85.0, "keeper": 95.0}
+                profile.technique_ids = ["aquablast", "gyroscopic_stop", "photo_stop"]
+                profile.karma_ids = ["thalassa"]
             profile.run_speed = 5.2 + float(index % 3) * 0.12
             profile.sprint_speed = 8.2 + float(index % 3) * 0.14
             profile.kit_color = Color("1675df") if team == 0 else Color("d93b4d")

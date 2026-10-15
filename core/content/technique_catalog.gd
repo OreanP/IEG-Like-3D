@@ -4,7 +4,9 @@ extends RefCounted
 ## Les modifications locales sont sérialisées dans user://, jamais dans les assets.
 
 const STORAGE_PATH: String = "user://match_content.json"
-const SCHEMA_VERSION: int = 2
+const SCHEMA_VERSION: int = 3
+const STAT_KEYS: PackedStringArray = ["shot", "dribble", "technique", "keeper", "defense"]
+const MAX_KARMA_OWNERS: int = 32
 const MAX_ACTIVE_PER_TEAM: int = 3
 const CATEGORIES: PackedStringArray = ["TIR", "ATT", "DEF", "GAR", "TAC", "KARMA", "RESONANCE"]
 const REQUIRED_FIELDS: PackedStringArray = ["id", "name", "category", "power", "cost", "duration", "range_bonus", "effect", "color", "description", "properties"]
@@ -48,8 +50,11 @@ func definitions_for(category: String) -> Array[Dictionary]:
             result.append(definition)
     return result
 
-func validate_definition(data: Dictionary) -> PackedStringArray:
+func validate_definition(data: Dictionary, references: Dictionary = {}) -> PackedStringArray:
     var errors: PackedStringArray = []
+    if references.is_empty():
+        references = _definition_graph(_overrides)
+        references[str(data.get("id", ""))] = data
     for key: String in REQUIRED_FIELDS:
         if not data.has(key):
             errors.append("Champ requis absent : " + key)
@@ -106,13 +111,20 @@ func validate_definition(data: Dictionary) -> PackedStringArray:
             elif _is_finite_number(properties.get("energy_max")) and float(properties["technique_energy_cost"]) > float(properties["energy_max"]):
                 errors.append("technique_energy_cost ne peut pas dépasser la réserve propre energy_max.")
         if str(data["category"]) == "RESONANCE":
-            if not properties.has("profile_a") or not properties.has("profile_b"):
-                errors.append("Une Resonance doit préciser profile_a et profile_b.")
-            elif properties["profile_a"] == properties["profile_b"]:
-                errors.append("Une Resonance doit réunir deux profils distincts.")
+            if not properties.has("donor_key"):
+                if not properties.has("profile_a") or not properties.has("profile_b"):
+                    errors.append("Une Resonance doit préciser donor_key ou les anciens profile_a et profile_b.")
+                elif typeof(properties["profile_a"]) == typeof(properties["profile_b"]) and properties["profile_a"] == properties["profile_b"]:
+                    errors.append("Une Resonance doit réunir deux profils distincts.")
             if not _is_finite_number(properties.get("blend")) or float(properties.get("blend", -1.0)) < 0.0 or float(properties.get("blend", -1.0)) > 1.0:
                 errors.append("Le mélange blend doit être compris entre 0 et 1.")
+        _validate_extended_properties(str(data["id"]), str(data["category"]), properties, references, errors)
     return errors
+
+func validate_entries(entries: Array[Dictionary]) -> PackedStringArray:
+    # Validation atomique du catalogue proposé ; aucun fichier ni override n'est modifié.
+    _checked_entries(entries)
+    return last_errors.duplicate()
 
 func save_overrides(entries: Array[Dictionary]) -> Error:
     last_notices.clear()
@@ -170,7 +182,7 @@ func load_overrides() -> Error:
         return ERR_INVALID_DATA
     var document: Dictionary = json.data
     var version: Variant = document.get("schema_version", -1)
-    if not _is_finite_number(version) or (float(version) != 1.0 and float(version) != float(SCHEMA_VERSION)) or not document.get("entries") is Array:
+    if not _is_finite_number(version) or (float(version) not in [1.0, 2.0, float(SCHEMA_VERSION)]) or not document.get("entries") is Array:
         last_errors.append("Version de contenu inconnue ou tableau entries absent.")
         return ERR_INVALID_DATA
     var legacy: bool = document["schema_version"] == 1
@@ -178,8 +190,8 @@ func load_overrides() -> Error:
     if not last_errors.is_empty():
         return ERR_INVALID_DATA
     _overrides = checked
-    if legacy:
-        last_notices.append("Fichier version 1 chargé sans écrasement. La prochaine sauvegarde utilisera le format version 2.")
+    if float(version) < float(SCHEMA_VERSION):
+        last_notices.append("Fichier version %d chargé sans écrasement. La prochaine sauvegarde utilisera le format version %d." % [int(version), SCHEMA_VERSION])
     return OK
 
 func reset_overrides() -> Error:
@@ -244,13 +256,127 @@ func _checked_entries(entries: Array) -> Dictionary:
             last_errors.append("L'entrée %d doit être un objet JSON." % (index + 1))
             continue
         var definition: Dictionary = entries[index]
-        for error: String in validate_definition(definition):
-            last_errors.append("Entrée %d : %s" % [index + 1, error])
         var id: String = str(definition.get("id", ""))
         if checked.has(id):
             last_errors.append("Identifiant en double : " + id)
         checked[id] = definition.duplicate(true)
+    # Vérifier le graphe final d'un seul bloc : l'ordre des entrées ne compte pas.
+    # Une modification locale ne doit pas invalider un lien d'un contenu de base.
+    var references: Dictionary = _definition_graph(checked)
+    for id: String in references:
+        for error: String in validate_definition(references[id], references):
+            last_errors.append("Contenu %s : %s" % [id, error])
     return checked
+
+func _definition_graph(overrides: Dictionary) -> Dictionary:
+    var result: Dictionary = {}
+    for definition: Dictionary in _defaults():
+        result[str(definition["id"])] = definition
+    for id: String in overrides:
+        result[id] = overrides[id]
+    return result
+
+func _validate_extended_properties(data_id: String, category: String, properties: Dictionary, references: Dictionary, errors: PackedStringArray) -> void:
+    var has_karma_budget: bool = category == "KARMA" and (properties.has("pg_max") or properties.has("pe_max") or properties.has("signature_id"))
+    if has_karma_budget:
+        for key: String in ["pg_max", "pe_max"]:
+            _validate_property_number(properties, key, 1.0, 1000.0, errors)
+        for key: String in ["pe_drain", "sprint_pe_drain", "duel_pg_cost", "duel_pe_cost", "defeat_pg_cost"]:
+            _validate_property_number(properties, key, 0.0, 1000.0, errors)
+        for key: String in ["duel_pg_cost", "defeat_pg_cost"]:
+            if _is_finite_number(properties.get(key)) and _is_finite_number(properties.get("pg_max")) and float(properties[key]) > float(properties["pg_max"]):
+                errors.append("%s ne peut pas dépasser pg_max." % key)
+        if _is_finite_number(properties.get("duel_pe_cost")) and _is_finite_number(properties.get("pe_max")) and float(properties["duel_pe_cost"]) > float(properties["pe_max"]):
+            errors.append("duel_pe_cost ne peut pas dépasser pe_max.")
+        if not properties.get("stat_bonuses") is Dictionary or properties.get("stat_bonuses", {}).is_empty():
+            errors.append("Un Karma à PG/PE doit définir stat_bonuses.")
+        else:
+            for key: Variant in properties["stat_bonuses"]:
+                if not key is String or not STAT_KEYS.has(str(key)):
+                    errors.append("Caractéristique de Karma inconnue : %s." % str(key))
+                _validate_property_number(properties["stat_bonuses"], str(key), 0.0, 100.0, errors)
+        _validate_reference(properties, "signature_id", ["TIR", "ATT", "DEF", "GAR"], references, errors)
+        var signature: Dictionary = references.get(str(properties.get("signature_id", "")), {})
+        if not signature.is_empty() and signature.get("properties") is Dictionary:
+            var source: String = str(signature["properties"].get("karma_id", ""))
+            if source != data_id:
+                errors.append("La signature propre doit définir karma_id vers ce Karma (%s)." % data_id)
+    if properties.has("appearance"):
+        if not properties["appearance"] is Dictionary:
+            errors.append("appearance doit être un objet JSON.")
+        else:
+            var appearance: Dictionary = properties["appearance"]
+            if not appearance.get("style") is String or not _valid_id(str(appearance.get("style", ""))):
+                errors.append("appearance.style doit être un identifiant valide.")
+            for key: String in ["primary", "accent"]:
+                if appearance.has(key) and (not appearance[key] is String or not Color.html_is_valid(str(appearance[key]))):
+                    errors.append("appearance.%s doit être une couleur HTML valide." % key)
+            for key: String in ["motif", "description", "sound"]:
+                if appearance.has(key) and (not appearance[key] is String or str(appearance[key]).length() > 1200):
+                    errors.append("appearance.%s doit être un texte de 1 200 caractères maximum." % key)
+            if appearance.has("height"):
+                _validate_property_number(appearance, "height", 0.1, 20.0, errors)
+    if properties.has("owner_keys"):
+        if not properties["owner_keys"] is Array or properties.get("owner_keys", []).size() > MAX_KARMA_OWNERS:
+            errors.append("owner_keys doit être un tableau de %d identifiants de propriétaires maximum." % MAX_KARMA_OWNERS)
+        else:
+            var owners_seen: Array = []
+            for owner_key: Variant in properties["owner_keys"]:
+                if not owner_key is String or not _valid_id(str(owner_key)) or owners_seen.has(owner_key):
+                    errors.append("owner_keys doit contenir des identifiants uniques, valides et non vides.")
+                owners_seen.append(owner_key)
+    if properties.has("karma_id") or properties.has("pg_cost") or properties.has("pe_cost"):
+        if category not in ["TIR", "ATT", "DEF", "GAR"]:
+            errors.append("Une signature de Karma doit être une technique TIR, ATT, DEF ou GAR.")
+        _validate_reference(properties, "karma_id", ["KARMA"], references, errors)
+        _validate_property_number(properties, "pg_cost", 0.0, 1000.0, errors)
+        _validate_property_number(properties, "pe_cost", 0.0, 1000.0, errors)
+        var owner: Dictionary = references.get(str(properties.get("karma_id", "")), {})
+        var budget: Dictionary = owner.get("properties", {}) if owner.get("properties") is Dictionary else {}
+        for pair: Array in [["pg_cost", "pg_max"], ["pe_cost", "pe_max"]]:
+            if _is_finite_number(properties.get(pair[0])) and _is_finite_number(budget.get(pair[1])) and float(properties[pair[0]]) > float(budget[pair[1]]):
+                errors.append("%s ne peut pas dépasser %s du Karma." % [pair[0], pair[1]])
+    if properties.has("optimal_min") or properties.has("optimal_max") or properties.has("distance_falloff"):
+        _validate_property_number(properties, "optimal_min", 0.0, 150.0, errors)
+        _validate_property_number(properties, "optimal_max", 0.0, 150.0, errors)
+        _validate_property_number(properties, "distance_falloff", 0.0, 20.0, errors)
+        if _is_finite_number(properties.get("optimal_min")) and _is_finite_number(properties.get("optimal_max")) and float(properties["optimal_min"]) > float(properties["optimal_max"]):
+            errors.append("optimal_min ne peut pas dépasser optimal_max.")
+    if category == "RESONANCE" and properties.has("donor_key"):
+        if not properties["donor_key"] is String or not _valid_id(str(properties["donor_key"])):
+            errors.append("donor_key doit être l'identifiant d'un donneur.")
+        if not properties.get("inherited_techniques") is Array or properties.get("inherited_techniques", []).size() != 2:
+            errors.append("Une Resonance doit transmettre exactement deux techniques.")
+        else:
+            var inherited: Array = properties["inherited_techniques"]
+            if inherited[0] is String and inherited[1] is String and inherited[0] == inherited[1]:
+                errors.append("Les deux techniques héritées doivent être distinctes.")
+            for id: Variant in inherited:
+                _validate_reference({"technique": id}, "technique", ["TIR", "ATT", "DEF", "GAR"], references, errors)
+                var source_properties: Variant = references.get(id, {}).get("properties", {}) if id is String else {}
+                if source_properties is Dictionary and source_properties.has("karma_id"):
+                    errors.append("Une signature de Karma ne peut pas occuper un emplacement de technique héritée.")
+        if properties.has("inherited_karma_id") and not (properties["inherited_karma_id"] is String and properties["inherited_karma_id"] == ""):
+            _validate_reference(properties, "inherited_karma_id", ["KARMA"], references, errors)
+        if not properties.get("stat_keys") is Array or properties.get("stat_keys", []).is_empty() or properties.get("stat_keys", []).size() > STAT_KEYS.size():
+            errors.append("stat_keys doit contenir les caractéristiques à transmettre.")
+        else:
+            var seen: Array = []
+            for key: Variant in properties["stat_keys"]:
+                if not key is String or not STAT_KEYS.has(str(key)) or seen.has(key):
+                    errors.append("Caractéristique de Resonance inconnue ou répétée : %s." % str(key))
+                seen.append(key)
+
+func _validate_reference(properties: Dictionary, key: String, categories: Array, references: Dictionary, errors: PackedStringArray) -> void:
+    var id: Variant = properties.get(key)
+    if not id is String or not _valid_id(str(id)):
+        errors.append("%s doit être un identifiant valide." % key)
+    elif not references.has(id) or not references[id].get("category") in categories:
+        errors.append("%s doit référencer un contenu existant de catégorie %s." % [key, "/".join(categories)])
+
+func _validate_property_number(properties: Dictionary, key: String, minimum: float, maximum: float, errors: PackedStringArray) -> void:
+    if not _is_finite_number(properties.get(key)) or float(properties.get(key, -1.0)) < minimum or float(properties.get(key, -1.0)) > maximum:
+        errors.append("La propriété %s doit être un nombre fini entre %s et %s." % [key, minimum, maximum])
 
 func _validate_number(data: Dictionary, key: String, minimum: float, maximum: float, errors: PackedStringArray) -> void:
     if not _is_finite_number(data[key]) or float(data[key]) < minimum or float(data[key]) > maximum:
@@ -329,4 +455,33 @@ func _defaults() -> Array[Dictionary]:
         _definition("twin_resonance", "Resonance : Double horizon", "RESONANCE", 12.0, 20.0, 60.0, 0.0, "resonance", "#ff9fe3",
             "Deux profils mettent leurs qualités en commun pour une fusion temporaire pondérée. Cumulable avec Karma ; trois Resonance maximum par équipe.",
             {"max_active_per_team": MAX_ACTIVE_PER_TEAM, "energy_max": 100.0, "energy_drain": 1.0, "technique_energy_cost": 0.0, "profile_a": 7, "profile_b": 10, "blend": 0.5}),
+        _definition("astreion", "Astreion, le Forgeron orbital", "KARMA", 0.0, 0.0, 600.0, 0.0, "karma", "#eaa266",
+            "Un colosse de métal bleu nuit et de cuivre incandescent ; une étoile tourne dans sa poitrine et trois anneaux gravitent autour de ses épaules. Calme et cérémonieux, il accompagne les gestes d'un finisseur.",
+            {"max_active_per_team": MAX_ACTIVE_PER_TEAM, "energy_max": 80.0, "energy_drain": 1.0, "technique_energy_cost": 0.0,
+            "pg_max": 240.0, "pe_max": 80.0, "pe_drain": 1.0, "sprint_pe_drain": 1.0, "duel_pg_cost": 10.0, "duel_pe_cost": 4.0, "defeat_pg_cost": 20.0,
+            "signature_id": "perihelion_hammer", "owner_keys": ["soren_vale"], "stat_bonuses": {"shot": 18.0, "dribble": 8.0},
+            "appearance": {"style": "astreion", "height": 4.0, "primary": "#152345", "accent": "#eaa266", "sound": "Trois coups de forge et une étoile qui s'allume.", "motif": "Casque-éclipse, marteau de forge et orbites de cuivre."}}),
+        _definition("thalassa", "Thalassa, la Sentinelle des marées", "KARMA", 0.0, 0.0, 600.0, 0.0, "karma", "#5fe3df",
+            "Une gardienne monumentale en verre marin ; son manteau évoque une raie manta et deux turbines tournent derrière ses épaules. Elle émerge d'un cercle d'eau avec patience et précision.",
+            {"max_active_per_team": MAX_ACTIVE_PER_TEAM, "energy_max": 100.0, "energy_drain": 1.0, "technique_energy_cost": 0.0,
+            "pg_max": 300.0, "pe_max": 100.0, "pe_drain": 1.0, "sprint_pe_drain": 1.0, "duel_pg_cost": 10.0, "duel_pe_cost": 4.0, "defeat_pg_cost": 20.0,
+            "signature_id": "abyssal_cathedral", "owner_keys": ["maelle_neris"], "stat_bonuses": {"keeper": 18.0, "defense": 10.0},
+            "appearance": {"style": "thalassa", "height": 4.0, "primary": "#165064", "accent": "#5fe3df", "sound": "Grondement sous-marin, turbines et tintements de verre.", "motif": "Ailes de raie, armure d'eau et boucliers transparents."}}),
+        _definition("perihelion_hammer", "Marteau du Périhélie", "TIR", 45.0, 0.0, 4.5, 5.0, "perihelion", "#eaa266",
+            "Trois anneaux compriment le ballon en un disque incandescent. La frappe du joueur rejoint le marteau d'Astreion et projette un météore dans un tunnel de lumière. Idéal de 10 à 28 mètres ; la puissance diminue ensuite.",
+            {"karma_id": "astreion", "pg_cost": 70.0, "pe_cost": 12.0, "preview": "perihelion", "branch_at": 0.58, "flight_arc": 3.0, "spin": 2.4, "optimal_min": 10.0, "optimal_max": 28.0, "distance_falloff": 1.2}),
+        _definition("abyssal_cathedral", "Cathédrale abyssale", "GAR", 45.0, 0.0, 4.8, 0.0, "abyssal", "#5fe3df",
+            "Thalassa ferme ses ailes et érige une voûte de colonnes d'eau. Après révélation des scores : la voûte ramène le ballon pour une capture, une colonne le dévie, ou les fissures la font éclater. La préparation reste identique.",
+            {"karma_id": "thalassa", "pg_cost": 80.0, "pe_cost": 14.0, "preview": "abyssal", "branch_at": 0.58, "capture": true,
+            "success_animation": "abyssal_capture", "parry_animation": "abyssal_parry", "failure_animation": "abyssal_shatter"}),
+        _definition("sovereign_orbit", "Résonance : Orbite souveraine", "RESONANCE", 0.0, 0.0, 75.0, 0.0, "resonance", "#eaa266",
+            "Soren Vale, attaquant stratège, synchronise ses appuis avec le receveur. Mèches cuivrées, yeux ambrés et constellations accompagnent Drift et Tir Magnus. Astreion devient invocable si le donneur le possède.",
+            {"max_active_per_team": MAX_ACTIVE_PER_TEAM, "energy_max": 75.0, "energy_drain": 1.0, "technique_energy_cost": 0.0,
+            "donor_key": "soren_vale", "inherited_techniques": ["drift", "magnus_shot"], "inherited_karma_id": "astreion", "stat_keys": ["shot", "dribble", "technique"], "blend": 0.2,
+            "appearance": {"style": "sovereign_orbit", "primary": "#eaa266", "accent": "#fff1d5", "motif": "Mèche cuivre et blanche, yeux ambrés, constellations et anneaux de chevilles."}}),
+        _definition("deep_watch", "Résonance : Vigie des profondeurs", "RESONANCE", 0.0, 0.0, 90.0, 0.0, "resonance", "#5fe3df",
+            "Maëlle Néris, gardienne observatrice, accorde deux courants autour des poignets du receveur. Aquablast et Arrêt Gyroscopique sont transmis ; Thalassa devient invocable si la donneuse la possède. Les gestes GAR restent réservés au gardien.",
+            {"max_active_per_team": MAX_ACTIVE_PER_TEAM, "energy_max": 90.0, "energy_drain": 1.0, "technique_energy_cost": 0.0,
+            "donor_key": "maelle_neris", "inherited_techniques": ["aquablast", "gyroscopic_stop"], "inherited_karma_id": "thalassa", "stat_keys": ["keeper", "defense", "technique"], "blend": 0.2,
+            "appearance": {"style": "deep_watch", "primary": "#5fe3df", "accent": "#e2fff8", "motif": "Mèche écume, yeux turquoise, courants sur les manches et anneaux aux poignets."}}),
     ]

@@ -7,6 +7,9 @@ var dazed_time: float = 0.0
 var keeper_stamina: float = 100.0
 ## Une entrée indépendante par famille : Karma et Resonance peuvent se cumuler.
 var modifiers: Dictionary = {}
+## Les budgets survivent aux désactivations et aux engagements ; recharge à la mi-temps.
+var karma_reserves: Dictionary = {}
+var resonance_used_period: int = 0
 var is_goalkeeper: bool = false
 var keeper_hold_time: float = 0.0
 var team_id: int = 0
@@ -39,6 +42,8 @@ func reset() -> void:
     dazed_time = 0.0
     keeper_stamina = 100.0
     modifiers.clear()
+    karma_reserves.clear()
+    resonance_used_period = 0
     keeper_hold_time = 0.0
     tackle_cooldown = 0.0
     recovery_time = 0.0
