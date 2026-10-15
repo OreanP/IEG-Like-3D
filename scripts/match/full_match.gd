@@ -54,6 +54,7 @@ func _ready() -> void:
     camera_rig.distance = 22.0
     var roster: Dictionary = Roster.build()
     session = Session.new(roster.profiles, roster.starts, roster.teams, roster.keepers, half_seconds)
+    _catalogue = session.catalog
     for state: IEGPlayerState in session.players:
         var view: IEGPlayerView = PlayerScene.instantiate()
         view.name = "Player%02d" % state.get_id()
@@ -92,6 +93,7 @@ func _ready() -> void:
     hud.special_shot_requested.connect(_arm_special)
     hud.tactic_requested.connect(_activate_tactic)
     hud.modifier_requested.connect(_activate_modifier)
+    hud.modifier_release_requested.connect(_release_modifier)
     ball_view.position = session.ball.position
     ball_view.reset_physics_interpolation()
     camera_rig.snap(Vector3(session.controlled().position.x, 1, session.controlled().position.y))
@@ -222,6 +224,11 @@ func _sync_views(delta: float) -> void:
     for player: IEGPlayerState in session.players:
         var view: IEGPlayerView = _views[player.get_id()]
         view.sync_state(player, player.get_id() == session.controlled_id, target != null and player.get_id() == target.get_id(), delta)
+        var active_definitions: Array[Dictionary] = []
+        for modifier: Dictionary in session.get_active_modifiers(player.get_id()):
+            active_definitions.append(_catalogue.get_definition(str(modifier["id"])))
+        var presentation_delta: float = delta if session.phase == session.Phase.LIVE and not _paused and not session.is_resetting() else 0.0
+        view.sync_modifier_visuals(active_definitions, presentation_delta)
     var before: Vector3 = ball_view.position
     ball_view.position = session.ball.position
     var movement: Vector3 = ball_view.position - before
@@ -297,7 +304,8 @@ func _start_second_half(formations: Dictionary) -> void:
 
 func _arm_special(technique_id: String) -> void:
     var definition: Dictionary = _catalogue.get_definition(technique_id)
-    if definition.is_empty() or str(definition.get("category", "")) != "TIR":
+    if definition.is_empty() or not session.can_use_technique(session.controlled_id, technique_id, "TIR"):
+        hud.show_message("Technique indisponible pour ce joueur ou réserves insuffisantes.")
         return
     _armed_technique = technique_id
     hud.set_armed_technique(definition)
@@ -308,24 +316,42 @@ func _activate_tactic(id: String) -> void:
     else:
         hud.show_message("Tactique indisponible.")
 
-func _activate_modifier(id: String) -> void:
+func _activate_modifier(id: String, player_id: int = -1) -> void:
+    var receiver_id: int = session.controlled_id if player_id < 0 else player_id
     var partner: int = -1
     var definition: Dictionary = _catalogue.get_definition(id)
     if str(definition.get("category", "")) == "RESONANCE":
         var properties: Dictionary = definition.get("properties", {})
+        var donor_key: String = str(properties.get("donor_key", ""))
         var profile_a: int = int(properties.get("profile_a", 7))
         var profile_b: int = int(properties.get("profile_b", 10))
-        var preferred: int = profile_b if session.controlled_id == profile_a else profile_a
+        var preferred: int = profile_b if receiver_id == profile_a else profile_a
         for state: IEGPlayerState in session.players:
-            if state.team_id == 0 and state.get_id() != session.controlled_id and not state.is_goalkeeper:
+            if state.team_id == 0 and state.get_id() != receiver_id:
+                if not donor_key.is_empty():
+                    if state.profile.content_key == donor_key:
+                        partner = state.get_id()
+                        break
+                    continue
+                if state.is_goalkeeper:
+                    continue
                 partner = state.get_id()
                 if state.get_id() == preferred:
                     break
-    if session.activate_modifier(session.controlled_id, id, partner):
+    if session.activate_modifier(receiver_id, id, partner):
+        _sync_views(0.0)
         hud.show_message("Activation : " + str(definition.get("name", id)))
     else:
         var reason: String = str(session.modifier_error)
         hud.show_message(reason if not reason.is_empty() else "Activation refusée : vérifiez l'énergie et le partenaire.", 5.0)
+
+func _release_modifier(category: String, player_id: int) -> void:
+    if session.deactivate_modifier(player_id, category):
+        _sync_views(0.0)
+        hud.show_message("Transformation dissipée · réserves conservées.")
+    else:
+        hud.show_message("Aucune transformation active à dissiper.")
+    _set_paused(false)
 
 func _rematch() -> void:
     _paused = false
@@ -370,6 +396,7 @@ func _close_editor() -> void:
         _armed_technique = ""
         hud.clear_armed_technique()
     hud.show_message("Retour au match · les contenus sauvegardés sont chargés.")
+    _sync_views(0.0)
 
 func _open_training() -> void:
     get_tree().change_scene_to_file("res://scenes/training_ground.tscn")

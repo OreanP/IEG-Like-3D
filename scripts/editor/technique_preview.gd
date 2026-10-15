@@ -2,6 +2,11 @@ extends SubViewportContainer
 ## Aperçu 3D autonome : aucune règle de simulation n'est résolue ici.
 ## Les gardiens ont un début partagé, puis deux fins après le temps des scores.
 
+const ModifierVisual = preload("res://scripts/presentation/modifier_visual.gd")
+var _modifier: Node3D
+var _camera: Camera3D
+var _world: Node3D
+var _outcome: String = "capture"
 var _definition: Dictionary = {}
 var _time: float = 0.0
 var _failure: bool = false
@@ -25,6 +30,7 @@ func _ready() -> void:
     viewport.msaa_3d = Viewport.MSAA_2X
     add_child(viewport)
     var world: Node3D = Node3D.new()
+    _world = world
     viewport.add_child(world)
     var environment_node: WorldEnvironment = WorldEnvironment.new()
     var environment: Environment = Environment.new()
@@ -36,6 +42,7 @@ func _ready() -> void:
     environment_node.environment = environment
     world.add_child(environment_node)
     var camera: Camera3D = Camera3D.new()
+    _camera = camera
     camera.position = Vector3(4.5, 3.2, 6.0)
     camera.fov = 43.0
     world.add_child(camera)
@@ -95,16 +102,33 @@ func _ready() -> void:
     _label.add_theme_constant_override("shadow_offset_x", 2)
     _label.add_theme_constant_override("shadow_offset_y", 2)
     canvas.add_child(_label)
+    _modifier = ModifierVisual.new()
+    world.add_child(_modifier)
+    _modifier.visible = false
+    if not _definition.is_empty():
+        set_definition(_definition)
 
 func set_definition(definition: Dictionary) -> void:
     _definition = definition.duplicate(true)
     _time = 0.0
+    if _modifier != null:
+        _modifier.configure(_definition)
+        _modifier.visible = str(_definition.get("category", "")) in ["KARMA", "RESONANCE"] or _modifier.style in ["astreion", "thalassa", "sovereign_orbit", "deep_watch"]
+        _modifier.position = Vector3(0, 0, 0.7) if _modifier.style in ["astreion", "thalassa"] else Vector3.ZERO
+        _camera.position = Vector3(6.0, 3.6, -8.0) if _modifier.visible else Vector3(4.5, 3.2, 6.0)
+        _camera.look_at(Vector3(0, 1.7 if _modifier.visible else 1.0, 0))
     if _material != null:
         _material.albedo_color = Color(String(_definition.get("color", "#a99aff")))
         _material.emission = _material.albedo_color
 
 func set_failure(value: bool) -> void:
     _failure = value
+    _outcome = "goal" if value else "capture"
+    _time = 0.0
+
+func set_outcome(value: String) -> void:
+    _outcome = value if value in ["capture", "deflection", "goal"] else "capture"
+    _failure = _outcome == "goal"
     _time = 0.0
 
 func _process(delta: float) -> void:
@@ -134,7 +158,13 @@ func _process(delta: float) -> void:
         ring.rotation = Vector3.ZERO
     for beam: MeshInstance3D in _frame:
         beam.visible = effect == "photo"
+    _ball.visible = true
+    for spark: MeshInstance3D in _sparks:
+        spark.visible = true
     _ball.position = Vector3(0.25, 0.25, 0.5)
+    if _modifier != null and _modifier.visible:
+        _render_modifier_preview(t, branch, release, effect)
+        return
     match effect:
         "orbital":
             _actor.rotation.y = -t * TAU * (1.0 - release)
@@ -231,3 +261,41 @@ func _cylinder(parent: Node3D, position: Vector3, radius: float, height: float, 
     mesh.height = height
     mesh.radial_segments = 12
     return _mesh(parent, mesh, position, material)
+
+func _render_modifier_preview(t: float, branch: float, release: float, effect: String) -> void:
+    for ring: MeshInstance3D in _rings:
+        ring.visible = false
+    for spark: MeshInstance3D in _sparks:
+        spark.visible = false
+    for beam: MeshInstance3D in _frame:
+        beam.visible = false
+    _actor.position = Vector3.ZERO
+    _actor.rotation = Vector3.ZERO
+    _ball.visible = effect in ["perihelion", "abyssal"]
+    _modifier.set_presentation(_time)
+    var props: Dictionary = _definition.get("properties", {})
+    if effect == "perihelion":
+        _modifier.set_signature_progress(minf(1, t / branch), release, _outcome)
+        _ball.position = Vector3(0, 0.4 + minf(t / branch, 1) * 1.3, -0.35 - release * 5)
+        _legs[1].rotation.x = lerpf(-0.8, 1.2, smoothstep(0.2, branch, t)) * (1 - release)
+        _arms[0].rotation.z = -0.8
+        _label.text = "%s • Signature d’Astreion\n%s PG / %s PE • préparation, frappe et météore" % [_definition.get("name", ""), props.get("pg_cost", 0), props.get("pe_cost", 0)]
+    elif effect == "abyssal":
+        _modifier.set_signature_progress(minf(1, t / branch), release, _outcome if t >= branch else "")
+        _arms[0].rotation.z = -0.9 + release * 0.4
+        _arms[1].rotation.z = 0.9 - release * 0.4
+        _ball.position = Vector3(0, 1.1, -3.5 * (1 - minf(t / branch, 1)) - 0.45)
+        if t >= branch:
+            if _outcome == "goal":
+                _ball.position.z += release * 5
+                _actor.rotation.x = -release * 0.3
+            elif _outcome == "deflection":
+                _ball.position += Vector3(release * 3.4, sin(release * PI) * 0.9, -release * 3)
+            else:
+                _ball.position = Vector3(0, 1.1 - release * 0.1, -0.45 + release * 0.15)
+        var ending: String = {"capture": "CAPTURE — voûte refermée", "deflection": "DÉVIATION — ballon libre", "goal": "ÉCHEC — voûte brisée"}.get(_outcome, "")
+        _label.text = "%s\n%s" % [_definition.get("name", ""), ending if t >= branch else "Préparation commune • scores puis résultat"]
+    elif _modifier.style in ["astreion", "thalassa"]:
+        _label.text = "%s\nKarma • %s PG / %s PE • %s" % [_definition.get("name", ""), props.get("pg_max", props.get("pg", "?")), props.get("pe_max", props.get("pe", "?")), props.get("signature_id", "")]
+    else:
+        _label.text = "%s\nRésonance • marques du donneur, deux techniques et héritage" % _definition.get("name", "")

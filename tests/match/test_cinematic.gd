@@ -1,6 +1,9 @@
 extends RefCounted
 ## Contrats de présentation réutilisables par la suite native, sans scène d'atelier.
 ## Exécuter run_all() une fois le SceneTree prêt, comme les autres tests de scène.
+const ModifierVisual = preload("res://scripts/presentation/modifier_visual.gd")
+const Catalog = preload("res://core/content/technique_catalog.gd")
+const Preview = preload("res://scripts/editor/technique_preview.gd")
 const Cinematic = preload("res://scripts/presentation/duel_cinematic.gd")
 const PlayerScene = preload("res://scenes/characters/player_view.tscn")
 const Match = preload("res://core/match/match_session.gd")
@@ -8,7 +11,7 @@ const Roster = preload("res://scripts/match/match_roster.gd")
 const Command = preload("res://core/game_command.gd")
 const Rules = preload("res://core/training_rules.gd")
 const IDS: Array[String] = ["orbital_shot", "magnus_shot", "combat_blade", "drift",
-    "hurricane_barrier", "aquablast", "photo_stop", "gyroscopic_stop"]
+    "hurricane_barrier", "aquablast", "photo_stop", "gyroscopic_stop", "perihelion_hammer", "abyssal_cathedral"]
 var _total: int = 0
 var _passed: int = 0
 var _lines: Array[String] = []
@@ -26,12 +29,13 @@ func run_all() -> Dictionary:
         return _report()
     for id: String in IDS:
         _technique_lifecycle(context, id)
-    for id: String in ["photo_stop", "gyroscopic_stop"]:
+    for id: String in ["photo_stop", "gyroscopic_stop", "abyssal_cathedral"]:
         _keeper_branches(context, id)
     _catalogue_overrides(context)
     _cancellation(context)
     _shot_block(context)
     _simulation_contracts()
+    _modifier_presentation(context)
     context.viewport.queue_free()
     return _report()
 
@@ -64,8 +68,8 @@ func _fixture() -> Dictionary:
         "defender": defender, "ball": ball, "camera": camera, "cinematic": cinematic}
 
 func _result(id: String, outcome: String = "") -> Dictionary:
-    var defending: bool = id in ["hurricane_barrier", "aquablast", "photo_stop", "gyroscopic_stop"]
-    var keeper: bool = id in ["photo_stop", "gyroscopic_stop", "orbital_shot", "magnus_shot"]
+    var defending: bool = id in ["hurricane_barrier", "aquablast", "photo_stop", "gyroscopic_stop", "abyssal_cathedral"]
+    var keeper: bool = id in ["photo_stop", "gyroscopic_stop", "orbital_shot", "magnus_shot", "perihelion_hammer", "abyssal_cathedral"]
     var attack_won: bool = not defending
     if outcome in ["capture", "deflection"]:
         attack_won = false
@@ -272,3 +276,70 @@ func _check(condition: bool, text: String) -> void:
 
 func _report() -> Dictionary:
     return {"total": _total, "passed": _passed, "failed": _total - _passed, "lines": _lines.duplicate()}
+
+func _modifier_presentation(context: Dictionary) -> void:
+    var catalog: IEGTechniqueCatalog = Catalog.new("user://cinematic_catalogue_unused.json")
+    for id: String in ["astreion", "thalassa", "sovereign_orbit", "deep_watch"]:
+        var visual: Node3D = ModifierVisual.new()
+        context.root.add_child(visual)
+        var definition: Dictionary = catalog.get_definition(id)
+        var before: Dictionary = definition.duplicate(true)
+        visual.configure(definition)
+        visual.set_presentation(1.0)
+        var pose: Array = []
+        _snapshot(visual, pose, false)
+        visual.set_presentation(1.0)
+        var same_pose: Array = []
+        _snapshot(visual, same_pose, false)
+        _check(visual.style == id and visual.find_children("*", "MeshInstance3D", true, false).size() >= 5,
+            id + " : forme originale en géométrie 3D réelle")
+        _check(pose == same_pose and definition == before, id + " : pose déterministe et définition préservée")
+        visual.set_presentation(2.0)
+        var animated: Array = []
+        _snapshot(visual, animated, false)
+        _check(animated != pose, id + " : orbites, flux ou corps animés")
+        visual.queue_free()
+    var palette: Node3D = ModifierVisual.new()
+    context.root.add_child(palette)
+    var palette_definition: Dictionary = catalog.get_definition("astreion")
+    palette_definition.properties.appearance.primary = "#133355"
+    palette_definition.properties.appearance.accent = "#f02090"
+    palette.configure(palette_definition)
+    var body: Node3D = palette.get("_body")
+    _check(body.get_child(0).material_override.albedo_color.is_equal_approx(Color("#133355"))
+        and palette.get("_core").material_override.albedo_color.is_equal_approx(Color("#f02090")),
+        "atelier : palettes primary et accent appliquées réellement aux matériaux 3D")
+    palette.configure({"id": "custom_style", "category": "KARMA", "color": "#ffffff", "properties": {"appearance": {"style": "unknown"}}})
+    _check(palette.find_children("*", "MeshInstance3D", true, false).size() >= 3,
+        "style personnalisé inconnu : aura de repli visible au lieu d'un aperçu vide")
+    palette.queue_free()
+    var view: IEGPlayerView = context.attacker
+    var actor_before: Array = _actors_snapshot(context)
+    var definitions: Array[Dictionary] = [catalog.get_definition("astreion"), catalog.get_definition("deep_watch")]
+    view.sync_modifier_visuals(definitions, 0.25)
+    _check(view.get("_modifier_views").size() == 2, "cumul : Karma et Résonance visibles sur le même joueur")
+    var frozen: Array = []
+    _snapshot(view, frozen)
+    view.sync_modifier_visuals(definitions, 0.0)
+    var frozen_after: Array = []
+    _snapshot(view, frozen_after)
+    _check(frozen == frozen_after, "pause : delta nul conserve toutes les poses de transformation")
+    var edited: Array[Dictionary] = definitions.duplicate(true)
+    edited[0].color = "#ee3377"
+    view.sync_modifier_visuals(edited, 0.0)
+    _check(view.get("_modifier_views")["astreion"].definition.color == "#ee3377",
+        "atelier : changement de couleur répercuté sur le Karma déjà actif")
+    view.sync_modifier_visuals([], 0.0)
+    _check(view.get("_modifier_views").is_empty() and _actors_snapshot(context) == actor_before,
+        "fin des transformations : accessoires retirés, modèle et matériaux originaux intacts")
+    var preview: SubViewportContainer = Preview.new()
+    context.viewport.add_child(preview)
+    preview.set_process(false)
+    for id: String in ["astreion", "thalassa", "sovereign_orbit", "deep_watch", "perihelion_hammer", "abyssal_cathedral"]:
+        preview.set_definition(catalog.get_definition(id))
+        preview.set_outcome("deflection")
+        preview._process(1.0)
+        _check(preview.get("_modifier").visible and preview.get("_modifier").find_child("SpiritBody", true, false) != null
+            if id in ["astreion", "thalassa", "perihelion_hammer", "abyssal_cathedral"] else preview.get("_modifier").visible,
+            id + " : aperçu atelier rendu et sélection de l'issue disponibles")
+    preview.queue_free()

@@ -1,14 +1,15 @@
 extends Node3D
-## Atelier visuel autonome : aperçu des huit gestes, et des deux issues GAR.
-## -- --verify contrôle les huit effets, les deux issues et la restauration.
+## Atelier visuel autonome : techniques ordinaires et signatures des Karma.
+## -- --verify contrôle les effets, les issues GAR et la restauration.
 
 const Cinematic = preload("res://scripts/presentation/duel_cinematic.gd")
 const PlayerScene = preload("res://scenes/characters/player_view.tscn")
 const Catalog = preload("res://core/content/technique_catalog.gd")
 const IDS: Array[String] = ["orbital_shot", "magnus_shot", "combat_blade", "drift",
-    "hurricane_barrier", "aquablast", "photo_stop", "gyroscopic_stop"]
+    "hurricane_barrier", "aquablast", "photo_stop", "gyroscopic_stop", "perihelion_hammer", "abyssal_cathedral"]
 const NAMES: Array[String] = ["Tir orbital · TIR", "Tir Magnus · TIR", "Lame de combat · ATT", "Drift · ATT",
-    "Barrage ouragan · DEF", "Aquablast · DEF", "Arrêt photo · GAR", "Arrêt gyroscopique · GAR"]
+    "Barrage ouragan · DEF", "Aquablast · DEF", "Arrêt photo · GAR", "Arrêt gyroscopique · GAR",
+    "Marteau du Périhélie · TIR", "Cathédrale abyssale · GAR"]
 var cinematic: IEGDuelCinematic
 var attacker: Node3D
 var defender: Node3D
@@ -137,8 +138,10 @@ func play_technique(id: String, success: bool = true) -> void:
         _index = selected_index
         _picker.select(selected_index)
     _outcome.set_pressed_no_signal(success)
-    var is_defender: bool = id in ["hurricane_barrier", "aquablast", "photo_stop", "gyroscopic_stop"]
-    var is_keeper: bool = id in ["photo_stop", "gyroscopic_stop", "orbital_shot", "magnus_shot"]
+    var definition: Dictionary = _catalog.get_definition(id)
+    var category: String = str(definition.get("category", ""))
+    var is_defender: bool = category in ["DEF", "GAR"]
+    var is_keeper: bool = category in ["TIR", "GAR"]
     var attacker_won: bool = not success if is_defender else success
     _scores.text = ""
     _wait = 0.0
@@ -149,8 +152,10 @@ func play_technique(id: String, success: bool = true) -> void:
         "attack_technique": "" if is_defender else id, "defend_technique": id if is_defender else "",
         "attack_score": 145 if attacker_won else 112, "defend_score": 112 if attacker_won else 145,
         "winner_id": 7 if attacker_won else 1, "attacker_won": attacker_won,
-        "duration": maxf(3.2, float(_catalog.get_definition(id).get("duration", 3.2))), "reveal_time": 1.4,
+        "duration": maxf(3.2, float(definition.get("duration", 3.2))), "reveal_time": 1.4,
         "techniques": _catalog.all_definitions()}
+    if category == "GAR":
+        result["reveal_time"] = float(result["duration"]) * float(definition.get("properties", {}).get("branch_at", 0.58))
     cinematic.begin(result, attacker, defender, ball)
     _status.text = "Charge · le temps du match est suspendu"
 
@@ -167,15 +172,16 @@ func _process(delta: float) -> void:
         for i: int in _saved_models.size():
             _check(_saved_models[i].transform.is_equal_approx(_baseline[i]), "transform modèle restaurée")
         _verify_index += 1
-        if _verify_index >= 10:
-            print("Duel preview: %d contrôles, %d échecs / 8 techniques + 2 issues gardien" % [_checks, _failures])
+        var keepers: Array[String] = _keeper_ids()
+        if _verify_index >= IDS.size() + keepers.size():
+            print("Duel preview: %d contrôles, %d échecs / %d techniques + %d issues gardien" % [_checks, _failures, IDS.size(), keepers.size()])
             get_tree().quit(0 if _failures == 0 else 1)
             return
-        if _verify_index < 8:
+        if _verify_index < IDS.size():
             _index = _verify_index
             play_technique(IDS[_index], true)
         else:
-            _index = _verify_index - 2
+            _index = IDS.find(keepers[_verify_index - IDS.size()])
             play_technique(IDS[_index], false)
     elif not _verify and _automatic.button_pressed and _wait >= 0.75:
         _index = (_index + 1) % IDS.size()
@@ -201,7 +207,7 @@ func _check(condition: bool, label: String) -> void:
         push_error("Duel preview: " + label)
 
 func _verify_keeper_prefix() -> void:
-    for id: String in ["photo_stop", "gyroscopic_stop"]:
+    for id: String in _keeper_ids():
         play_technique(id, true)
         cinematic.advance(1.0)
         var success: Array = []
@@ -216,6 +222,13 @@ func _verify_keeper_prefix() -> void:
             _snapshot(model, failure)
         _check(success == failure, "GAR : début identique avant révélation pour " + id)
         cinematic.stop()
+
+func _keeper_ids() -> Array[String]:
+    var result: Array[String] = []
+    for id: String in IDS:
+        if _catalog.get_definition(id).get("category", "") == "GAR":
+            result.append(id)
+    return result
 
 func _snapshot(node: Node, result: Array) -> void:
     if node is Node3D:

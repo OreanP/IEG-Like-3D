@@ -9,6 +9,9 @@ extends Node3D
 @onready var selection_ring: MeshInstance3D = $SelectionRing
 @onready var target_ring: MeshInstance3D = $PassTargetRing
 @onready var number_label: Label3D = $Number
+const ModifierVisual = preload("res://scripts/presentation/modifier_visual.gd")
+var _modifier_views: Dictionary = {}
+var _modifier_time: float = 0.0
 var _animations: AnimationPlayer
 var _clips: Dictionary = {}
 var _current: String = ""
@@ -110,3 +113,32 @@ func _apply_transparency(node: Node, amount: float) -> void:
         node.transparency = amount
     for child: Node in node.get_children():
         _apply_transparency(child, amount)
+
+## Définitions du catalogue déjà choisies par la session. delta=0 fige les poses.
+func sync_modifier_visuals(definitions: Array[Dictionary], delta: float = 0.0) -> void:
+    _modifier_time += maxf(0.0, delta)
+    var wanted: Dictionary = {}
+    for definition: Dictionary in definitions:
+        var id: String = str(definition.get("id", ""))
+        if id.is_empty():
+            continue
+        wanted[id] = true
+        if not _modifier_views.has(id):
+            var modifier: Node3D = ModifierVisual.new()
+            modifier.name = "Modifier_" + id
+            add_child(modifier)
+            modifier.configure(definition)
+            if str(definition.get("category", "")) == "KARMA":
+                modifier.position = Vector3(0, 0, 0.85)
+                modifier.scale = Vector3.ONE * 0.82
+            _modifier_views[id] = modifier
+        elif _modifier_views[id].definition != definition:
+            # L’atelier peut modifier une forme déjà active : rafraîchir sans changer ses budgets.
+            _modifier_views[id].configure(definition)
+        _modifier_views[id].set_presentation(_modifier_time)
+    for id: String in _modifier_views.keys():
+        if not wanted.has(id):
+            var modifier: Node3D = _modifier_views[id]
+            remove_child(modifier)
+            modifier.queue_free()
+            _modifier_views.erase(id)

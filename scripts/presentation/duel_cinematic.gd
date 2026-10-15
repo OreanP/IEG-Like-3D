@@ -3,6 +3,8 @@ extends Node3D
 ## La simulation fournit un résultat figé. Ce noeud ne modifie ni état ni possession.
 ## Seuls les modèles visuels sont mis en scène ; stop() rétablit leur état exact.
 
+const ModifierVisual = preload("res://scripts/presentation/modifier_visual.gd")
+
 signal reveal
 signal finished
 
@@ -239,6 +241,12 @@ func _render() -> void:
         _camera.position.z += aftermath * 3.0
     _camera.look_at(_stage.to_global(Vector3(0.0, 1.0, 0.3 + aftermath * (1.5 if keeper else 0.4))), Vector3.UP)
     _camera.fov = 48.0 - windup * 4.0 + burst * 4.0
+    for effect: Dictionary in _fx:
+        if effect.id in ["perihelion_hammer", "abyssal_cathedral"]:
+            _camera.position = Vector3(9.2 - windup * 0.7, 4.0,
+                4.2 - windup * 1.5 if effect.id == "perihelion_hammer" else -5.0 + windup * 2.0)
+            _camera.look_at(_stage.to_global(Vector3(0, 1.8, 0.4)), Vector3.UP)
+            _camera.fov = 49.0
 
 func _position_actor(index: int, point: Vector3, facing: Vector3, roll: float, pitch: float) -> void:
     if index >= _actors.size() or not is_instance_valid(_actors[index].model):
@@ -270,7 +278,8 @@ func _create_technique(id: String, actor_index: int) -> void:
     var colors: Dictionary = {"orbital_shot": Color("bca0ff"), "magnus_shot": Color("ffc45c"),
         "hurricane_barrier": Color("a3ffc0"), "aquablast": Color("50d9ff"),
         "combat_blade": Color("ff5b83"), "drift": Color("71ffe0"),
-        "photo_stop": Color("fff7bd"), "gyroscopic_stop": Color("77b3ff")}
+        "photo_stop": Color("fff7bd"), "gyroscopic_stop": Color("77b3ff"),
+        "perihelion_hammer": Color("eaa266"), "abyssal_cathedral": Color("5fe3df")}
     effect.color = colors.get(signature, Color("eee6cb"))
     if definition.get("color") is String and Color.html_is_valid(definition.color):
         effect.color = Color.html(definition.color)
@@ -278,6 +287,23 @@ func _create_technique(id: String, actor_index: int) -> void:
     var intensity: float = clampf(0.8 + power / 150.0, 0.8, 1.65) if is_finite(power) else 1.0
     root.scale = Vector3.ONE * intensity
     match signature:
+        "perihelion_hammer", "abyssal_cathedral":
+            var spirit: Node3D = ModifierVisual.new()
+            root.add_child(spirit)
+            var visual_definition: Dictionary = definition.duplicate(true)
+            visual_definition.id = id
+            visual_definition.effect = "perihelion" if signature == "perihelion_hammer" else "abyssal"
+            spirit.configure(visual_definition)
+            effect.spirit = spirit
+            if signature == "perihelion_hammer":
+                var projectile: Node3D = Node3D.new()
+                projectile.name = "PerihelionMeteor"
+                _stage.add_child(projectile)
+                effect.projectile = projectile
+                for index: int in 3:
+                    effect.pieces.append(_ring(projectile, 0.28 + index * 0.12, effect.color))
+                for index: int in 12:
+                    effect.pieces.append(_sphere(projectile, 0.045 + (index % 3) * 0.02, effect.color))
         "orbital_shot", "gyroscopic_stop":
             for i: int in 3:
                 effect.pieces.append(_ring(root, 0.75 + float(i) * 0.22, effect.color))
@@ -322,7 +348,8 @@ func _technique_definition(id: String) -> Dictionary:
 func _effect_signature(effect: String, fallback: String) -> String:
     var aliases: Dictionary = {"orbital": "orbital_shot", "magnus": "magnus_shot",
         "hurricane": "hurricane_barrier", "aqua": "aquablast", "blade": "combat_blade",
-        "drift": "drift", "photo": "photo_stop", "gyro": "gyroscopic_stop"}
+        "drift": "drift", "photo": "photo_stop", "gyro": "gyroscopic_stop",
+        "perihelion": "perihelion_hammer", "abyssal": "abyssal_cathedral"}
     if aliases.has(effect):
         return aliases[effect]
     if effect in aliases.values():
@@ -341,6 +368,30 @@ func _animate_technique(effect: Dictionary, charge: float, after: float) -> void
     var rupture: float = after if revealed and not owner_won else 0.0
     var time: float = elapsed
     match id:
+        "perihelion_hammer", "abyssal_cathedral":
+            var spirit: Node3D = effect.spirit
+            root.position = Vector3(0, 0, -2.0 if owner_index == 0 else 2.85)
+            root.rotation.y = PI if owner_index == 0 else 0.0
+            spirit.set_presentation(time)
+            spirit.set_signature_progress(charge, after if revealed else 0.0,
+                str(duel_data.get("outcome", "goal" if won else "capture")) if revealed else "")
+            if id == "perihelion_hammer":
+                effect.projectile.position = _ghost_ball.position
+                for index: int in mini(3, pieces.size()):
+                    pieces[index].rotation = Vector3(time * (2 + index), index * PI / 3, time * 1.5)
+                    pieces[index].scale = Vector3.ONE * (0.55 + energy * 0.6)
+                for index: int in range(3, pieces.size()):
+                    var angle: float = index * 2.4 + time * 8
+                    var distance: float = (index - 2) * 0.1
+                    pieces[index].position = Vector3(cos(angle) * 0.3, sin(angle) * 0.3,
+                        -distance * (0.3 + after * 2))
+                _bone(owner_index, "UpperArmL", Vector3(-0.6 * energy, 0, -0.8 * energy))
+                _bone(owner_index, "Chest", Vector3(-sin(charge * PI) * 0.2, -sin(charge * PI) * 0.6, 0))
+                if not revealed:
+                    _ghost_ball.position.y += sin(charge * PI) * 1.3
+            else:
+                _bone(owner_index, "UpperArmL", Vector3(1.0 * energy, 0, -0.5 * energy))
+                _bone(owner_index, "UpperArmR", Vector3(1.0 * energy, 0, 0.5 * energy))
         "orbital_shot":
             root.position = _ghost_ball.position
             for i: int in mini(3, pieces.size()):

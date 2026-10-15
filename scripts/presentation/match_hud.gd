@@ -11,7 +11,8 @@ signal duel_choice_requested(choice: String, technique_id: String)
 signal second_half_requested(formations: Dictionary)
 signal special_shot_requested(technique_id: String)
 signal tactic_requested(tactic_id: String)
-signal modifier_requested(content_id: String)
+signal modifier_requested(content_id: String, player_id: int)
+signal modifier_release_requested(category: String, player_id: int)
 signal menu_opened
 
 const INK := Color("edf4f8")
@@ -30,6 +31,11 @@ var _energy: ProgressBar
 var _charge: ProgressBar
 var _modifier_labels: Dictionary = {}
 var _modifier_bars: Dictionary = {}
+var _karma_pg_label: Label
+var _karma_pg_bar: ProgressBar
+var _stat_label: Label
+var _inherited_label: Label
+var _action_player_id: int = -1
 var _keeper_bars: Array[ProgressBar] = []
 var _keeper_labels: Array[Label] = []
 var _team_modifier_counts: Array[Label] = []
@@ -87,12 +93,16 @@ func _ready() -> void:
         _keeper_labels.append(_text(keeper_column, "Gardien " + ("Azur" if team == 0 else "Carmin"), 13, AQUA if team == 0 else Color("ff9d9a")))
         _keeper_bars.append(_bar(keeper_column, 100, AQUA if team == 0 else Color("ff9d9a")))
         _team_modifier_counts.append(_text(keeper_column, "Karma 0/3 · Resonance 0/3", 12, MUTED))
-    var player_panel: VBoxContainer = _panel(Vector2(0, 1), Rect2(20, -290, 332, 270))
+    var player_panel: VBoxContainer = _panel(Vector2(0, 1), Rect2(20, -384, 380, 364))
     _live_panels.append(player_panel.get_parent())
     _player = _text(player_panel, "Joueur", 21, INK)
     _status = _text(player_panel, "Endurance", 13, MUTED)
     _energy = _bar(player_panel, 100, GOLD)
     _charge = _bar(player_panel, 1, AQUA)
+    _karma_pg_label = _text(player_panel, "", 13, GOLD)
+    _karma_pg_bar = _bar(player_panel, 300, GOLD)
+    _karma_pg_label.visible = false
+    _karma_pg_bar.visible = false
     for category: String in ["KARMA", "RESONANCE"]:
         var color: Color = AQUA if category == "KARMA" else Color("c3a2ff")
         var modifier_label: Label = _text(player_panel, "", 13, color)
@@ -101,6 +111,10 @@ func _ready() -> void:
         _modifier_bars[category] = modifier_bar
         modifier_label.visible = false
         modifier_bar.visible = false
+    _stat_label = _text(player_panel, "", 12, GOLD)
+    _stat_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    _inherited_label = _text(player_panel, "", 12, AQUA)
+    _inherited_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     var player_tools := HBoxContainer.new()
     player_panel.add_child(player_tools)
     _button(player_tools, "Techniques", func(): open_actions("TIR"), 32)
@@ -196,7 +210,7 @@ func refresh(delta: float, session, controls: IEGLocalPlayerInput, paused: bool)
     _help.text = ("Stick G : déplacement · RT : sprint\nA : passe · Y : lob · X : tir chargé · B : tacle\nRB : cible · LB : joueur · Stick D : caméra\nL3 / V : techniques et tactiques · Start : pause"
         if controls.uses_gamepad else "ZQSD / WASD : mouvement · Maj : sprint\nEspace : passe · G : lob · E : tacle · Q : cible\nF / clic G : tir chargé · Tab : joueur\nClic D : caméra · V : actions · Échap : pause")
     _message_life = maxf(0, _message_life - delta)
-    _message.visible = _message_life > 0 and session.phase == session.Phase.LIVE
+    _message.visible = _message_life > 0 and session.phase == session.Phase.LIVE and not _overlay.visible
     if session.phase != _last_phase:
         _last_phase = session.phase
         match session.phase:
@@ -272,7 +286,11 @@ func _show_duel() -> void:
     _text(_column, "TECHNIQUE SPÉCIALE · " + category, 16, AQUA)
     for definition: Dictionary in _for_category(category):
         var id: String = str(definition.get("id", ""))
-        var special: Button = _button(_column, "%s  ·  %s" % [_definition_name(definition), _cost_text(definition)], func(): duel_choice_requested.emit("special", id))
+        var actor: IEGPlayerState = _duel_actor()
+        var prepaid: bool = attack and id == str(duel.get("prepaid_technique", ""))
+        var cost: String = "déjà payée" if prepaid else _cost_text(definition)
+        var special: Button = _button(_column, "%s  ·  %s" % [_definition_name(definition), cost], func(): duel_choice_requested.emit("special", id))
+        special.disabled = not prepaid and not _session.can_use_technique(actor.get_id(), id, category)
         _duel_tech_buttons.append(special)
         _description(definition)
     _text(_column, "Croix directionnelle / flèches : naviguer · A / Entrée : valider", 14, MUTED)
@@ -342,20 +360,36 @@ func _show_finished() -> void:
     _button(_column, "Retour à l'entraînement", func(): training_requested.emit())
     first.grab_focus()
 
-func open_actions(category: String = "TIR") -> void:
+func open_actions(category: String = "TIR", player_id: int = -1) -> void:
     if _session == null or _session.phase != _session.Phase.LIVE:
         return
     menu_opened.emit()
+    _action_player_id = _session.controlled_id if player_id < 0 else player_id
     var names: Dictionary = {"TIR": "TECHNIQUES DE TIR", "TAC": "TACTIQUES", "KARMA": "Karma", "RESONANCE": "Resonance"}
     var description: String = "Le chrono est arrêté pendant ce choix."
     if category in ["KARMA", "RESONANCE"]:
         description += "\nKarma et Resonance peuvent se cumuler sur un joueur.\nTrois Karma et trois Resonance maximum par équipe."
         description += "\nActifs dans votre équipe : Karma %d/3 · Resonance %d/3" % [_session.count_active_modifiers(0, "KARMA"), _session.count_active_modifiers(0, "RESONANCE")]
     _reset_overlay("actions_" + category, str(names.get(category, category)), description)
+    if category in ["KARMA", "RESONANCE"]:
+        var receiver: IEGPlayerState = _session.get_player(_action_player_id)
+        var receiver_row := HBoxContainer.new()
+        _column.add_child(receiver_row)
+        _button(receiver_row, "← Joueur", func(): _cycle_receiver(category, -1), 38)
+        var receiver_name: Label = _text(receiver_row, "%02d · %s" % [receiver.profile.shirt_number, receiver.profile.display_name], 18, INK)
+        receiver_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        receiver_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        _button(receiver_row, "Joueur →", func(): _cycle_receiver(category, 1), 38)
+        _text(_column, "Choisir un receveur ne change ni le porteur ni la sélection en jeu.", 13, MUTED)
+        for active: Dictionary in _session.get_active_modifiers(_action_player_id):
+            if str(active.get("category", "")) == category:
+                _button(_column, "Dissiper : " + _name_for_id(str(active.get("id", ""))), func(): modifier_release_requested.emit(category, _action_player_id))
     var first: Button = null
     for definition: Dictionary in _for_category(category):
         var id: String = str(definition.get("id", ""))
         var button: Button = _button(_column, "%s  ·  %s" % [_definition_name(definition), _cost_text(definition)], func(): _activate_content(category, id))
+        if category == "TIR":
+            button.disabled = not _session.can_use_technique(_session.controlled_id, id, category)
         if first == null:
             first = button
         _description(definition)
@@ -372,17 +406,47 @@ func _activate_content(category: String, id: String) -> void:
     match category:
         "TIR": special_shot_requested.emit(id)
         "TAC": tactic_requested.emit(id)
-        _: modifier_requested.emit(id)
+        _: modifier_requested.emit(id, _action_player_id)
     resume_requested.emit()
 
 func _for_category(category: String) -> Array[Dictionary]:
+    if _session != null:
+        if category in ["TIR", "ATT", "DEF", "GAR"]:
+            var actor: IEGPlayerState = _duel_actor() if _mode == "duel" else _session.controlled()
+            var available: Array[Dictionary] = _session.get_available_techniques(actor.get_id(), category)
+            # Un tir prépayé traverse le blocage même si son Karma s'est épuisé.
+            if _mode == "duel" and _session.duel.get("local_role", "attack") == "attack":
+                var prepaid_id: String = str(_session.duel.get("prepaid_technique", ""))
+                var prepaid: Dictionary = _session.catalog.get_definition(prepaid_id)
+                if bool(_session.duel.get("shot_chain", false)):
+                    available.clear()
+                if prepaid.get("category", "") == category:
+                    available.append(prepaid)
+            return available
+        if category in ["KARMA", "RESONANCE"]:
+            return _session.get_available_modifiers(_action_player_id, category)
     var result: Array[Dictionary] = []
     for definition: Dictionary in _definitions:
         if str(definition.get("category", "")) == category:
             result.append(definition)
     return result
 
+func _duel_actor() -> IEGPlayerState:
+    var duel: Dictionary = _session.duel
+    return _session.get_player(int(duel["actor_id"] if duel.get("local_role", "attack") == "attack" else duel["target_id"]))
+
+func _cycle_receiver(category: String, direction: int) -> void:
+    var allies: Array[int] = []
+    for state: IEGPlayerState in _session.players:
+        if state.team_id == _session.LOCAL_TEAM:
+            allies.append(state.get_id())
+    var index: int = allies.find(_action_player_id)
+    open_actions(category, allies[posmod(index + direction, allies.size())])
+
 func _refresh_modifiers(session, player: IEGPlayerState) -> void:
+    _karma_pg_label.visible = false
+    _karma_pg_bar.visible = false
+    _inherited_label.visible = false
     for category: String in _modifier_labels:
         _modifier_labels[category].visible = false
         _modifier_bars[category].visible = false
@@ -397,11 +461,36 @@ func _refresh_modifiers(session, player: IEGPlayerState) -> void:
         var remaining: int = maxi(0, ceili(float(modifier.get("time", 0))))
         var energy: float = maxf(0, float(modifier.get("energy", 0)))
         label.text = "%s · %02d:%02d · %.0f réserve" % [name, remaining / 60, remaining % 60, energy]
+        if category == "KARMA" and modifier.has("pg"):
+            _karma_pg_label.text = "Karma · PG %.0f / %.0f" % [modifier["pg"], modifier["pg_max"]]
+            _karma_pg_label.tooltip_text = _name_for_id(id)
+            _karma_pg_label.visible = true
+            _karma_pg_bar.max_value = maxf(1.0, float(modifier["pg_max"]))
+            _karma_pg_bar.value = float(modifier["pg"])
+            _karma_pg_bar.visible = true
+            label.text = "Karma · PE %.0f / %.0f" % [modifier["pe"], modifier["pe_max"]]
+            if bool(modifier.get("inherited_from", false)):
+                label.text += " · hérité"
+        elif category == "RESONANCE" and modifier.has("techniques"):
+            label.text = "Resonance · %02d:%02d" % [remaining / 60, remaining % 60]
+            var inherited_names: PackedStringArray = []
+            for technique: Variant in modifier["techniques"]:
+                inherited_names.append(_name_for_id(str(technique)))
+            _inherited_label.text = "Héritées : " + ", ".join(inherited_names)
+            _inherited_label.visible = not inherited_names.is_empty()
         label.tooltip_text = _name_for_id(id)
-        bar.max_value = _modifier_max_energy(id)
+        bar.max_value = maxf(1.0, float(modifier.get("pe_max", modifier.get("energy_max", _modifier_max_energy(id)))))
         bar.value = energy
         label.visible = true
         bar.visible = true
+    var bonuses: Dictionary = session.get_stat_bonuses(player.get_id())
+    var stat_names: Dictionary = {"shot": "Tir", "dribble": "Dribble", "technique": "Technique", "defense": "Défense", "keeper": "Gardien"}
+    var displayed: PackedStringArray = []
+    for stat: String in stat_names:
+        if float(bonuses.get(stat, 0.0)) > 0.0:
+            displayed.append("%s +%.0f" % [stat_names[stat], bonuses[stat]])
+    _stat_label.text = " · ".join(displayed)
+    _stat_label.visible = not displayed.is_empty()
 
 func _modifier_max_energy(id: String) -> float:
     for definition: Dictionary in _definitions:
@@ -420,6 +509,13 @@ func _name_for_id(id: String) -> String:
     return ""
 
 func _cost_text(definition: Dictionary) -> String:
+    var properties: Dictionary = definition.get("properties", {})
+    if properties.has("karma_id"):
+        return "%.0f PG · %.0f PE" % [properties.get("pg_cost", 0.0), properties.get("pe_cost", 0.0)]
+    if properties.has("pg_max"):
+        return "%.0f PG · %.0f PE" % [properties["pg_max"], properties.get("pe_max", 0.0)]
+    if properties.has("inherited_techniques"):
+        return "%.0f s · 2 techniques" % float(definition.get("duration", 0.0))
     var cost: float = float(definition.get("cost", definition.get("energy_cost", 0)))
     return "%d énergie" % roundi(cost) if cost > 0 else "activation"
 
