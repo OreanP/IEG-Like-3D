@@ -4,7 +4,9 @@ IEG LIKE GODOT — VERSION GDSCRIPT
 2. Ouvrir Godot standard 4.7 stable.
 3. Importer le project.godot de CE dossier.
 4. Laisser Godot importer les modèles 3D.
-5. F5 pour lancer l'entraînement.
+5. F5 pour lancer le match complet de test (2 x 3 minutes).
+6. V / L3 : techniques, tactiques, Écho et Résonance. Atelier : éditer.
+7. Les scènes entraînement et diagnostic restent accessibles séparément (F6).
 
 Aucun SDK .NET, aucune commande de compilation C#, aucune extension à installer.
 Le moteur Godot n'est pas inclus.
@@ -18,9 +20,12 @@ R : replacer. C : recentrer. Échap/Start/Options : pause.
 
 Les contrôles détaillés et la liste des fonctions sont dans README.md.
 Validation actuelle : voir docs/DEVELOPMENT.md.
-87 tests natifs, 12 contrôles scène/entrées et 7 scénarios de diagnostic réussis
+238 tests natifs, 27 contrôles match, 12 contrôles entraînement
+et 7 scénarios de diagnostic réussis
 sous Godot standard 4.7. Rendu sur écran et manette physique non essayés.
 
 Tests : bash tools/validate.sh (cloud Linux).
 Diagnostic interactif : ouvrir scenes/diagnostic.tscn puis F6.
 Tacle : B/Rond/E. Lob : Y/Triangle/G. Cible : RB/R1/Q physique.
+
+Le match, les duels, les huit techniques et l’atelier : docs/FULL_MATCH.md.

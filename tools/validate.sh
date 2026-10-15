@@ -29,8 +29,11 @@ run_checked() {
     fi
 }
 run_checked import --editor --import
-run_checked tests --script res://tests/development/test_cli.gd
+run_checked tests --script res://tests/match/test_cli.gd
 run_checked scene-input --script res://tests/development/scene_smoke.gd
-run_checked training --quit-after 180
+run_checked training res://scenes/training_ground.tscn --quit-after 180
+run_checked match-input --script res://tests/match/scene_smoke.gd
+run_checked full-match res://scenes/full_match.tscn --quit-after 180 -- --smoke
+run_checked content-editor res://scenes/content_editor.tscn --quit-after 120
 run_checked diagnostic res://scenes/diagnostic.tscn -- --verify
 printf 'Validation terminée. Journaux : %s\n' "$log_root"
