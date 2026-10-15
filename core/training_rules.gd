@@ -34,22 +34,24 @@ static func closest_segment_time(a: Vector2, b: Vector2, point: Vector2) -> floa
         return 0.0
     return clampf((point - a).dot(segment) / segment.length_squared(), 0.0, 1.0)
 
-static func goal_crossing_time(start: Vector3, finish: Vector3) -> float:
+static func goal_crossing_time(start: Vector3, finish: Vector3,
+        pitch_half_length: float = HALF_LENGTH, goal_width: float = GOAL_HALF_WIDTH,
+        goal_height: float = GOAL_HEIGHT) -> float:
     # Il faut que le ballon entier ait franchi la ligne. Test balayé anti-tunneling.
     for side: int in [-1, 1]:
-        var plane: float = float(side) * (HALF_LENGTH + BALL_RADIUS)
-        if float(side) * start.z >= HALF_LENGTH + BALL_RADIUS:
+        var plane: float = float(side) * (pitch_half_length + BALL_RADIUS)
+        if float(side) * start.z >= pitch_half_length + BALL_RADIUS:
             continue
-        if float(side) * finish.z < HALF_LENGTH + BALL_RADIUS:
+        if float(side) * finish.z < pitch_half_length + BALL_RADIUS:
             continue
         var dz: float = finish.z - start.z
         if absf(dz) < 0.00001:
             continue
         var t: float = (plane - start.z) / dz
         var hit: Vector3 = start.lerp(finish, t)
-        if (absf(hit.x) <= GOAL_HALF_WIDTH - BALL_RADIUS
+        if (absf(hit.x) <= goal_width - BALL_RADIUS
                 and hit.y >= BALL_RADIUS - 0.01
-                and hit.y <= GOAL_HEIGHT - BALL_RADIUS):
+                and hit.y <= goal_height - BALL_RADIUS):
             return t
     return INF
 

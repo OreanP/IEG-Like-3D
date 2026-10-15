@@ -1,0 +1,48 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/match/full_match.gd" id="1_match"]
+[ext_resource type="Script" path="res://scripts/match/match_arena.gd" id="2_arena"]
+[ext_resource type="PackedScene" path="res://assets/ball/football.glb" id="3_ball"]
+[ext_resource type="Script" path="res://scripts/input/local_player_input.gd" id="4_input"]
+[ext_resource type="Script" path="res://scripts/presentation/orbit_camera.gd" id="5_camera"]
+[ext_resource type="Script" path="res://scripts/presentation/match_hud.gd" id="6_hud"]
+
+[node name="FullMatch" type="Node3D"]
+process_mode = 3
+script = ExtResource("1_match")
+
+[node name="Arena" type="Node3D" parent="."]
+script = ExtResource("2_arena")
+
+[node name="Players" type="Node3D" parent="."]
+
+[node name="BallView" parent="." instance=ExtResource("3_ball")]
+position = Vector3(0, 0.19, 0.4)
+
+[node name="LocalInput" type="Node" parent="."]
+script = ExtResource("4_input")
+
+[node name="CameraRig" type="Node3D" parent="."]
+physics_interpolation_mode = 2
+script = ExtResource("5_camera")
+distance = 22.0
+
+[node name="Camera3D" type="Camera3D" parent="CameraRig"]
+position = Vector3(0, 11.5, 18.8)
+rotation = Vector3(-0.55, 0, 0)
+current = true
+fov = 64.0
+near = 0.1
+far = 300.0
+
+[node name="AimArrow" type="MeshInstance3D" parent="."]
+physics_interpolation_mode = 2
+cast_shadow = 0
+
+[node name="ShootingZone" type="MeshInstance3D" parent="."]
+physics_interpolation_mode = 2
+cast_shadow = 0
+
+[node name="HUD" type="CanvasLayer" parent="."]
+process_mode = 3
+script = ExtResource("6_hud")

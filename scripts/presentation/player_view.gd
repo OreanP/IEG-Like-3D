@@ -60,6 +60,7 @@ func _configure_tree(node: Node) -> void:
 
 func sync_state(state: IEGPlayerState, selected: bool, pass_target: bool, delta: float) -> void:
     position = Vector3(state.position.x, 0.0, state.position.y)
+    _set_inactive_visual(state.dazed_time > 0.0)
     var angle: float = atan2(-state.facing.x, -state.facing.y)
     rotation.y = lerp_angle(rotation.y, angle, 1.0 - exp(-16.0 * delta))
     selection_ring.visible = selected
@@ -100,3 +101,12 @@ func represent_save(captured: bool) -> void:
     visual_model.rotation.z = 0.12 if captured else -0.28
     if not captured:
         kick()
+
+func _set_inactive_visual(inactive: bool) -> void:
+    _apply_transparency(visual_model, 0.55 if inactive else 0.0)
+
+func _apply_transparency(node: Node, amount: float) -> void:
+    if node is GeometryInstance3D:
+        node.transparency = amount
+    for child: Node in node.get_children():
+        _apply_transparency(child, amount)

@@ -18,6 +18,10 @@ enum EventKind { PASS, SHOT, RECEPTION, GOAL, OUT, RESET, SELECTION,
 
 const LOCAL_TEAM: int = 0
 
+var half_width: float = Rules.HALF_WIDTH
+var half_length: float = Rules.HALF_LENGTH
+var goal_half_width: float = Rules.GOAL_HALF_WIDTH
+var goal_height: float = Rules.GOAL_HEIGHT
 var players: Array[IEGPlayerState] = []
 var events: Array[Dictionary] = []
 var ball: IEGBallState = BallState.new()
@@ -30,7 +34,9 @@ var _since_kick: float = 10.0
 var _last_kicker: int = -1
 
 func _init(profiles: Array[IEGPlayerProfile] = [],
-        start_positions: Array[Vector2] = [], team_ids: Array[int] = [], goalkeeper_roles: Array[bool] = []) -> void:
+        start_positions: Array[Vector2] = [], team_ids: Array[int] = [], goalkeeper_roles: Array[bool] = [], pitch_size: Vector2 = Vector2(12.0, 18.0)) -> void:
+    half_width = pitch_size.x
+    half_length = pitch_size.y
     var roster: Array[IEGPlayerProfile] = profiles.duplicate()
     var spawns: Array[Vector2] = start_positions.duplicate()
     var teams: Array[int] = team_ids.duplicate()
@@ -43,7 +49,7 @@ func _init(profiles: Array[IEGPlayerProfile] = [],
     if teams.is_empty():
         for _index: int in range(roster.size()):
             teams.append(LOCAL_TEAM)
-    if not valid_setup(roster, spawns, teams):
+    if not valid_setup(roster, spawns, teams, Vector2(half_width, half_length)):
         push_warning("Effectif S1 invalide : retour aux trois joueurs S0.")
         roster = default_profiles()
         spawns = [Vector2(0.0, 8.0), Vector2(-5.0, 2.0), Vector2(5.0, -1.0)]
@@ -68,7 +74,7 @@ static func default_profiles() -> Array[IEGPlayerProfile]:
     return result
 
 static func valid_setup(roster: Array[IEGPlayerProfile],
-        spawns: Array[Vector2], teams: Array[int]) -> bool:
+        spawns: Array[Vector2], teams: Array[int], pitch_size: Vector2 = Vector2(12.0, 18.0)) -> bool:
     if roster.is_empty() or roster.size() != spawns.size() or roster.size() != teams.size():
         return false
     var ids: Array[int] = []
@@ -81,7 +87,7 @@ static func valid_setup(roster: Array[IEGPlayerProfile],
             return false
         if not spawns[index].is_finite():
             return false
-        if absf(spawns[index].x) > Rules.HALF_WIDTH - 0.6 or absf(spawns[index].y) > Rules.HALF_LENGTH - 0.6:
+        if absf(spawns[index].x) > pitch_size.x - 0.6 or absf(spawns[index].y) > pitch_size.y - 0.6:
             return false
         ids.append(profile.player_id)
         has_local_player = has_local_player or teams[index] == LOCAL_TEAM
@@ -202,15 +208,14 @@ func _advance_players(commands: Dictionary) -> void:
             player.sprint_exhausted = false
         var sprinting: bool = moving and command.sprint and not player.sprint_exhausted and player.recovery_time <= 0.0
         var speed: float = player.profile.sprint_speed if sprinting else player.profile.run_speed
+        speed *= player.speed_multiplier
         if player.recovery_time > 0.0:
             speed *= DuelRules.RECOVERY_SPEED_FACTOR
         var target: Vector2 = move * speed
         player.velocity = player.velocity.lerp(target, 1.0 - exp(-13.0 * Rules.TICK))
         player.position = _clamp_player(player.position + player.velocity * Rules.TICK)
         if player.is_goalkeeper:
-            var side: float = 1.0 if player.team_id == 0 else -1.0
-            player.position.x = clampf(player.position.x, -4.0, 4.0)
-            player.position.y = clampf(player.position.y * side, 12.0, 17.4) * side
+            _clamp_keeper(player)
         if moving:
             player.facing = move.normalized()
         var energy_rate: float = -19.0 if sprinting else 11.0
@@ -246,8 +251,8 @@ func _try_tackle(actor: IEGPlayerState, aim: Vector2) -> void:
     _emit(EventKind.TACKLE_WON, actor.get_id(), owner.get_id())
 
 func _clamp_player(value: Vector2) -> Vector2:
-    return value.clamp(Vector2(-Rules.HALF_WIDTH + 0.6, -Rules.HALF_LENGTH + 0.6),
-        Vector2(Rules.HALF_WIDTH - 0.6, Rules.HALF_LENGTH - 0.6))
+    return value.clamp(Vector2(-half_width + 0.6, -half_length + 0.6),
+        Vector2(half_width - 0.6, half_length - 0.6))
 
 func _separate_players() -> void:
     for i: int in range(players.size()):
@@ -342,7 +347,7 @@ func _advance_ball() -> void:
     ball.position = next_position
     ball.velocity = velocity
     # Ordre temporel : une réception antérieure au passage de la ligne prime.
-    var goal_t: float = Rules.goal_crossing_time(before, next_position)
+    var goal_t: float = goal_crossing_time(before, next_position)
     var first: IEGPlayerState = null
     var first_t: float = INF
     for player: IEGPlayerState in players:
@@ -366,7 +371,7 @@ func _advance_ball() -> void:
             else:
                 # Déviation = ballon libre. Aucun changement de sélection.
                 var outward: Vector2 = Vector2(0.45 if contact.x >= first.position.x else -0.45,
-                    -1.0 if first.team_id == 0 else 1.0).normalized()
+                    attack_direction(first.team_id)).normalized()
                 ball.position = Rules.on_ground(first.position + outward * 1.22, maxf(contact.y, Rules.BALL_RADIUS))
                 _release(first.get_id(), BallState.Mode.FREE,
                     Rules.on_ground(outward * clampf(velocity.length() * 0.45, 5.0, 14.0), 2.2))
@@ -381,15 +386,15 @@ func _advance_ball() -> void:
     if is_finite(goal_t):
         goals += 1
         # Le but franchi détermine le score, y compris un but contre son camp.
-        var scoring_team: int = 0 if next_position.z < 0.0 else 1
+        var scoring_team: int = scoring_team_for_goal(next_position.z)
         team_goals[scoring_team] += 1
         _reset_timer = 1.4
         ball.velocity = Vector3.ZERO
         _emit(EventKind.GOAL, _last_kicker)
         events[events.size() - 1]["team_id"] = scoring_team
         return
-    if (absf(next_position.x) > Rules.HALF_WIDTH + 0.3
-            or absf(next_position.z) > Rules.HALF_LENGTH + 0.3):
+    if (absf(next_position.x) > half_width + 0.3
+            or absf(next_position.z) > half_length + 0.3):
         _reset_timer = 0.9
         ball.velocity = Vector3.ZERO
         _emit(EventKind.OUT, _last_kicker)
@@ -444,3 +449,20 @@ func _gain_possession(player: IEGPlayerState) -> void:
     player.keeper_hold_time = 0.0
     if player.team_id == LOCAL_TEAM:
         controlled_id = player.get_id()
+
+func goal_crossing_time(before: Vector3, after: Vector3) -> float:
+    return Rules.goal_crossing_time(before, after, half_length, goal_half_width, goal_height)
+
+func attack_direction(team: int) -> float:
+    return -1.0 if team == 0 else 1.0
+
+func attacking_goal(team: int) -> Vector2:
+    return Vector2(0.0, attack_direction(team) * half_length)
+
+func scoring_team_for_goal(z: float) -> int:
+    return 0 if z * attack_direction(0) > 0.0 else 1
+
+func _clamp_keeper(player: IEGPlayerState) -> void:
+    var side: float = 1.0 if player.team_id == 0 else -1.0
+    player.position.x = clampf(player.position.x, -4.0, 4.0)
+    player.position.y = clampf(player.position.y * side, 12.0, 17.4) * side

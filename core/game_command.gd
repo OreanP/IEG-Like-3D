@@ -2,6 +2,7 @@ class_name IEGGameCommand
 extends RefCounted
 ## Intentions seulement. Un futur client réseau ne choisit pas le résultat.
 
+var technique_id: String = ""
 var move: Vector2 = Vector2.ZERO
 var aim: Vector2 = Vector2(0.0, -1.0)
 var pass_target_id: int = -1
@@ -16,7 +17,7 @@ var reset_drill: bool = false
 
 func to_dict() -> Dictionary:
     return {
-        "move": [move.x, move.y], "aim": [aim.x, aim.y],
+        "technique_id": technique_id, "move": [move.x, move.y], "aim": [aim.x, aim.y],
         "pass_target_id": pass_target_id, "lob_pass": lob_pass, "tackle": tackle, "sprint": sprint, "pass_ball": pass_ball, "shoot": shoot,
         "shot_charge": shot_charge, "switch_player": switch_player,
         "reset_drill": reset_drill,
@@ -24,6 +25,9 @@ func to_dict() -> Dictionary:
 
 static func from_dict(data: Dictionary) -> IEGGameCommand:
     var command: IEGGameCommand = IEGGameCommand.new()
+    var technique: Variant = data.get("technique_id", "")
+    if technique is String and technique.length() <= 80:
+        command.technique_id = technique
     command.move = _read_vector(data.get("move", null), Vector2.ZERO)
     command.aim = _read_vector(data.get("aim", null), Vector2(0.0, -1.0))
     var target: Variant = data.get("pass_target_id", -1)
