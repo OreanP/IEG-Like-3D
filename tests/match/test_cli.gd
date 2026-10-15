@@ -6,6 +6,8 @@ const Development = preload("res://tests/development/test_suite.gd")
 const FullMatch = preload("res://tests/match/test_match.gd")
 const Content = preload("res://tests/match/test_content.gd")
 const Cinematic = preload("res://tests/match/test_cinematic.gd")
+const Augmentations = preload("res://tests/match/test_augmentations.gd")
+const Editor = preload("res://tests/match/test_editor.gd")
 
 func _initialize() -> void:
     call_deferred("_run")
@@ -13,7 +15,7 @@ func _initialize() -> void:
 func _run() -> void:
     var total: int = 0
     var passed: int = 0
-    for suite: RefCounted in [Baseline.new(), Opposition.new(), Development.new(), FullMatch.new(), Content.new(), Cinematic.new()]:
+    for suite: RefCounted in [Baseline.new(), Opposition.new(), Development.new(), FullMatch.new(), Content.new(), Cinematic.new(), Augmentations.new(), Editor.new()]:
         var report: Dictionary = suite.run_all()
         total += int(report["total"])
         passed += int(report["passed"])

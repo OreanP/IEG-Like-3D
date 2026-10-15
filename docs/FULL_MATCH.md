@@ -59,18 +59,29 @@ La mi-temps propose, pour chaque équipe, une disposition équilibrée, large ou
 | GAR | Arrêt photo | Cadre lumineux, flash et capture ou rupture |
 | GAR | Arrêt Gyroscopique | Anneaux gyroscopiques, protection ou dispersion |
 
-Les deux techniques GAR partagent strictement leur préparation entre réussite et échec, puis divergent lorsque les scores apparaissent. Une capture, une déviation réussie et un but reçu ont des fins visuelles distinctes. Les modèles, os, caméras, décorations et visibilité du ballon sont restaurés après chaque cinématique. Les effets lisent la couleur, la famille visuelle et la puissance du catalogue ; la durée de présentation est bornée entre 1,8 et 10 secondes.
+Les techniques GAR, y compris la nouvelle Cathédrale abyssale, partagent strictement leur préparation entre réussite et échec, puis divergent lorsque les scores apparaissent. Une capture, une déviation réussie et un but reçu ont des fins visuelles distinctes. Les modèles, os, caméras, décorations et visibilité du ballon sont restaurés après chaque cinématique. Les effets lisent la couleur, la famille visuelle et la puissance du catalogue ; la durée de présentation est bornée entre 1,8 et 10 secondes.
 
 Les contenus sauvegardés sont des overrides dans `user://match_content.json`, hors des fichiers source. En cloud Linux, le dossier utilisateur est sous `/workspace/.local/share/godot/app_userdata/`. Ils sont rechargés au retour de l'atelier. Les sauvegardes de l’ancien système Écho sont migrées vers Karma à la lecture, sans perdre les paramètres personnalisés ; le format courant est réécrit à la prochaine sauvegarde explicite. La prévisualisation simplifiée de l'atelier sert à éditer les paramètres ; `scenes/duel_preview.tscn` montre les gestes complets sur les personnages, avec bascule réussite/échec et parcours automatique.
 
 Deux tactiques sont incluses : **Ailes ouvertes** (largeur et soutien) et **Étau collectif** (bloc compact et pression). Leurs propriétés agissent sur le placement IA.
 
-Les deux systèmes se nomment **Karma** et **Resonance** :
+Les deux systèmes se nomment **Karma** et **Résonance**. Deux Karma complets et deux Résonances sont maintenant jouables ; [KARMA_RESONANCE.md](KARMA_RESONANCE.md) détaille les ressources, profils, héritages, contrôles et champs d'édition :
+
+- **Astreion, le Forgeron orbital** : 240 PG, 80 PE, bonus offensifs et Marteau du Périhélie.
+- **Thalassa, la Sentinelle des marées** : 300 PG, 100 PE, bonus défensifs et Cathédrale abyssale.
+- **Orbite souveraine** : Résonance de Soren Vale, 75 secondes ; Drift, Tir Magnus, trois bonus de statistiques et accès éventuel à Astreion.
+- **Vigie des profondeurs** : Résonance de Maëlle Néris, 90 secondes ; Aquablast, Arrêt Gyroscopique, trois bonus et accès éventuel à Thalassa.
+
+Les propriétaires Soren (Azur n° 7) et Maëlle (Azur n° 1) sont présents dans le roster. Chaque joueur de match possède ses techniques personnelles ; les deux techniques transmises s'ajoutent temporairement à celles-ci. Les bonus sont calculés depuis les statistiques de base du donneur. Un Karma hérité doit lui appartenir réellement et occupe une place du quota collectif. Le donneur reste sur le terrain.
+
+Les anciens prototypes sont conservés pour les sauvegardes et les tests historiques :
 
 - **Karma : Vigie des vents** : renforcement temporaire, réserve propre qui se vide en jeu et lors des techniques ; puissance supplémentaire et légère accélération.
 - **Resonance : Double impulsion** : association temporaire avec un partenaire allié, pondération des profils et bonus d'affrontement. La vitesse tient compte du profil partenaire. L'association est refusée sans partenaire valide.
 
-Un joueur peut **cumuler Karma et Resonance**, avec une réserve et une durée indépendantes pour chacun. Chaque équipe peut maintenir **3 Karmas et 3 Resonance au maximum**, soit jusqu’à six états actifs répartis sur trois à six joueurs. Une seconde activation de la même famille sur un joueur déjà actif et une quatrième activation dans l’équipe sont refusées sans dépense ni remise à zéro. L’expiration ou l’épuisement d’un état libère uniquement sa place, sans supprimer l’autre famille. Les compteurs sont affichés pour les deux équipes. Ces états sont éditables comme les tactiques et les techniques. Il s'agit de variantes propres au prototype, pas d'une reproduction complète des systèmes des jeux de référence.
+Un joueur peut **cumuler un Karma et une Résonance**. Chaque équipe peut maintenir **3 Karma et 3 Résonances au maximum**, soit jusqu’à six états actifs répartis sur trois à six joueurs. Une seconde activation de la même famille et une quatrième activation dans l’équipe sont refusées sans dépense ni remise à zéro. Les nouveaux Karma ont deux réserves persistantes PG/PE ; une désactivation ou un but ne les recharge pas. Les nouvelles Résonances durent 75/90 secondes par défaut, avec une activation par receveur et par mi-temps. Leur fin retire aussi le Karma s'il provenait uniquement du donneur. Les compteurs sont affichés pour les deux équipes ; l'endurance du gardien reste séparée.
+
+L'atelier propose des champs PG/PE, coûts, statistiques, propriétaires, donneur, deux techniques et Karma hérité, ainsi que des palettes et styles visuels. Dupliquer un Karma copie et relie sa signature. Le catalogue valide les références croisées avant une sauvegarde atomique au schéma 3 ; les versions 1/2 restent lisibles sans écriture automatique. Les silhouettes procédurales d'Astreion/Thalassa et les marques de Résonance sont présentes en jeu et en aperçu. Il s'agit de variantes originales du prototype, pas d'une reproduction complète des systèmes des jeux de référence.
 
 ## Architecture et validation exécutée
 
@@ -90,9 +101,9 @@ bash tools/validate.sh
 "$GODOT_BIN" --headless --path . res://scenes/content_editor.tscn --quit-after 120
 ```
 
-Résultats Godot `4.7.stable.official.5b4e0cb0f` : **265/265 tests natifs** (87 historiques, 76 match, 33 catalogue, 69 cinématiques), **32/32 contrôles de la vraie scène de match**, **12/12 contrôles scène/entrées de l'entraînement**, **7/7 diagnostics de l'entraînement**. Import, démarrages et `git diff --check` réussis, sans erreur moteur/script. Les tests parcourent notamment deux périodes complètes sans saut du chrono, le gel des duels, les coûts, les changements de camp et les deux déviations physiques de seconde période.
+Résultats Godot `4.7.stable.official.5b4e0cb0f` : **385/385 tests natifs** (87 historiques, 76 match, 55 catalogue, 109 présentation, 37 augmentations et 21 atelier), **32/32 contrôles de la vraie scène de match**, **22/22 contrôles des vrais menus Karma/Résonance**, **12/12 contrôles scène/entrées de l'entraînement**, **81 contrôles de prévisualisation sans échec** et **7/7 diagnostics de l'entraînement**. Import, démarrages et `git diff --check` réussis, sans erreur moteur/script. Les tests parcourent notamment deux périodes complètes sans saut du chrono, le gel des duels, les coûts, les changements de camp et les deux déviations physiques de seconde période. Les nouveaux cas vérifient réserves persistantes, héritage réel, plafonds, durée éditée, duplication/sauvegarde, palettes et tir prépayé après épuisement du Karma.
 
-Le rendu réel OpenGL 4.5/Mesa llvmpipe a été exécuté sous Xvfb : terrain, atelier, choix de duel, révélation et huit familles d'effets inspectés. Le pilote signale seulement que VSync n'est pas pris en charge. Ces vérifications graphiques ne mesurent pas les performances sur le GPU d'un joueur.
+Le rendu réel OpenGL 4.5/Mesa llvmpipe a été exécuté sous écran virtuel : terrain, atelier, choix de duel, révélation, dix techniques et quatre transformations inspectés. Les dernières captures emploient Xorg avec pilote dummy ; l'audio est également dummy, sans validation sonore. Le pilote signale seulement que VSync n'est pas pris en charge. Les noms longs et les champs d'héritage ont été contrôlés à 1280×800. Ces vérifications graphiques ne mesurent pas les performances sur le GPU d'un joueur.
 
 ## Limites et références
 
