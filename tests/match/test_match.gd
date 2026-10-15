@@ -5,6 +5,7 @@ const Training = preload("res://core/training_session.gd")
 const Command = preload("res://core/game_command.gd")
 const Profile = preload("res://core/player_profile.gd")
 const Rules = preload("res://core/training_rules.gd")
+const Roster = preload("res://scripts/match/match_roster.gd")
 
 func run_all() -> Dictionary:
     var cases: Array[Callable] = [_clock_live, _halftime_boundary, _halftime_freeze,
@@ -22,13 +23,22 @@ func run_all() -> Dictionary:
         _keeper_special_stamina_cost, _keeper_result, _keeper_attack_goal,
         _keeper_deflection_is_not_possession, _keeper_enemy_capture_not_selected,
         _second_half_shot_credits_attacker,
-        _tactic_validation, _modifier_exclusive, _modifier_partner_validation,
+        _tactic_validation, _karma_then_resonance, _modifier_partner_validation,
         _complete_match_from_kickoff, _kickoff_protection, _kickoff_circle_clear,
         _block_attack_category, _block_defense_capture, _block_before_keeper,
         _block_success_chains_keeper, _block_prepaid_once, _block_reject_offline,
         _dazed_cannot_receive, _long_range_invalid_choice_rollback,
         _long_range_requires_affordable_technique, _out_of_range_shot_does_not_prompt,
-        _second_half_blue_physical_deflection, _second_half_red_physical_deflection]
+        _second_half_blue_physical_deflection, _second_half_red_physical_deflection,
+        _default_five_minute_halves, _resonance_then_karma, _karma_team_limit,
+        _resonance_team_limit, _duplicate_karma_preserves_state,
+        _duplicate_resonance_preserves_state, _modifier_activation_frozen,
+        _modifier_reserves_frozen_during_duel, _karma_expiry_frees_slot,
+        _resonance_expiry_frees_slot, _modifier_reserves_independent,
+        _technique_consumes_separate_reserves, _modifier_bonuses_stack,
+        _modifier_speed_bonuses_stack, _restart_preserves_both_modifiers,
+        _halftime_preserves_both_modifiers, _modifiers_snapshot_isolated,
+        _modifier_team_caps_independent, _enemy_activation_rejected]
     var lines: Array[String] = []
     var passed: int = 0
     for test: Callable in cases:
@@ -397,11 +407,14 @@ func _tactic_validation() -> bool:
     var s: RefCounted = fixture()
     return not s.set_tactic(0, "drift") and not s.set_tactic(99, "wide_wings") and s.set_tactic(0, "wide_wings")
 
-func _modifier_exclusive() -> bool:
+func _karma_then_resonance() -> bool:
     var s: RefCounted = fixture()
-    if not s.activate_modifier(7, "tempest_echo"):
+    if not s.activate_modifier(7, "tempest_karma") or not s.activate_modifier(7, "twin_resonance", 10):
         return false
-    return not s.activate_modifier(7, "twin_resonance", 10)
+    var categories: Array[String] = []
+    for active: Dictionary in s.get_active_modifiers(7):
+        categories.append(String(active["category"]))
+    return categories.size() == 2 and "KARMA" in categories and "RESONANCE" in categories and s.count_active_modifiers(0, "KARMA") == 1 and s.count_active_modifiers(0, "RESONANCE") == 1
 
 func _modifier_partner_validation() -> bool:
     var s: RefCounted = fixture()
@@ -567,3 +580,223 @@ func _second_half_blue_physical_deflection() -> bool:
 
 func _second_half_red_physical_deflection() -> bool:
     return second_half_physical_deflection(1)
+
+func modifier_fixture() -> RefCounted:
+    var roster: Dictionary = Roster.build()
+    var s: RefCounted = Match.new(roster.profiles, roster.starts, roster.teams, roster.keepers)
+    s.controlled_id = 7
+    s.ball.owner_id = 7
+    s._duel_cooldown = 0.0
+    s._follow_owner()
+    return s
+
+func _default_five_minute_halves() -> bool:
+    var s: RefCounted = modifier_fixture()
+    return s.players.size() == 22 and s.half_duration == 300.0 and s.period == 1
+
+func _resonance_then_karma() -> bool:
+    var s: RefCounted = fixture()
+    return s.activate_modifier(7, "twin_resonance", 10) and s.activate_modifier(7, "tempest_karma") and s.get_active_modifiers(7).size() == 2
+
+func _karma_team_limit() -> bool:
+    var s: RefCounted = modifier_fixture()
+    for id: int in [7, 8, 9]:
+        if not s.activate_modifier(id, "tempest_karma"):
+            return false
+    var energy: float = s.get_player(10).energy
+    return not s.activate_modifier(10, "tempest_karma") and s.count_active_modifiers(0, "KARMA") == 3 and s.get_player(10).energy == energy and s.get_active_modifiers(10).is_empty() and not s.modifier_error.is_empty()
+
+func _resonance_team_limit() -> bool:
+    var s: RefCounted = modifier_fixture()
+    for id: int in [7, 8, 9]:
+        if not s.activate_modifier(id, "twin_resonance", 10):
+            return false
+    var energy: float = s.get_player(10).energy
+    return not s.activate_modifier(10, "twin_resonance", 11) and s.count_active_modifiers(0, "RESONANCE") == 3 and s.get_player(10).energy == energy and s.get_active_modifiers(10).is_empty() and not s.modifier_error.is_empty()
+
+func _duplicate_karma_preserves_state() -> bool:
+    var s: RefCounted = fixture()
+    if not s.activate_modifier(7, "tempest_karma"):
+        return false
+    var player: IEGPlayerState = s.get_player(7)
+    player.energy = 42.0
+    player.modifiers["KARMA"]["energy"] = 54.0
+    player.modifiers["KARMA"]["time"] = 12.0
+    var before: String = JSON.stringify(player.modifiers)
+    return not s.activate_modifier(7, "tempest_karma") and player.energy == 42.0 and JSON.stringify(player.modifiers) == before and not s.modifier_error.is_empty()
+
+func _duplicate_resonance_preserves_state() -> bool:
+    var s: RefCounted = fixture()
+    if not s.activate_modifier(7, "twin_resonance", 10):
+        return false
+    var player: IEGPlayerState = s.get_player(7)
+    player.energy = 55.0
+    player.modifiers["RESONANCE"]["energy"] = 44.0
+    player.modifiers["RESONANCE"]["time"] = 23.0
+    var before: String = JSON.stringify(player.modifiers)
+    return not s.activate_modifier(7, "twin_resonance", 8) and player.energy == 55.0 and JSON.stringify(player.modifiers) == before and not s.modifier_error.is_empty()
+
+func _modifier_activation_frozen() -> bool:
+    var s: RefCounted = field_fixture()
+    begin_field(s)
+    var before: float = s.get_player(7).energy
+    if s.activate_modifier(7, "tempest_karma") or s.activate_modifier(7, "twin_resonance", 10):
+        return false
+    if s.get_player(7).energy != before or not s.get_player(7).modifiers.is_empty():
+        return false
+    s.choose_duel("left")
+    before = s.get_player(7).energy
+    return not s.activate_modifier(7, "twin_resonance", 10) and s.get_player(7).energy == before and s.get_player(7).modifiers.is_empty()
+
+func _modifier_reserves_frozen_during_duel() -> bool:
+    var s: RefCounted = field_fixture()
+    s.activate_modifier(7, "tempest_karma")
+    s.activate_modifier(7, "twin_resonance", 10)
+    begin_field(s)
+    var before: String = JSON.stringify(s.get_player(7).modifiers)
+    for _tick: int in range(120):
+        s.step(Command.new())
+    return s.phase == Match.Phase.DUEL_CHOICE and JSON.stringify(s.get_player(7).modifiers) == before
+
+func _karma_expiry_frees_slot() -> bool:
+    var s: RefCounted = modifier_fixture()
+    for id: int in [7, 8, 9]:
+        if not s.activate_modifier(id, "tempest_karma"):
+            return false
+    s.activate_modifier(7, "twin_resonance", 10)
+    s.get_player(7).modifiers["KARMA"]["time"] = Rules.TICK * 0.5
+    s.step(Command.new())
+    if s.count_active_modifiers(0, "KARMA") != 2 or not s.get_player(7).modifiers.has("RESONANCE"):
+        return false
+    return s.activate_modifier(10, "tempest_karma") and s.count_active_modifiers(0, "KARMA") == 3
+
+func _resonance_expiry_frees_slot() -> bool:
+    var s: RefCounted = modifier_fixture()
+    for id: int in [7, 8, 9]:
+        if not s.activate_modifier(id, "twin_resonance", 10):
+            return false
+    s.activate_modifier(7, "tempest_karma")
+    s.get_player(7).modifiers["RESONANCE"]["time"] = Rules.TICK * 0.5
+    s.step(Command.new())
+    if s.count_active_modifiers(0, "RESONANCE") != 2 or not s.get_player(7).modifiers.has("KARMA"):
+        return false
+    return s.activate_modifier(10, "twin_resonance", 11) and s.count_active_modifiers(0, "RESONANCE") == 3
+
+func _modifier_reserves_independent() -> bool:
+    var s: RefCounted = fixture()
+    s.activate_modifier(7, "tempest_karma")
+    s.activate_modifier(7, "twin_resonance", 10)
+    var player: IEGPlayerState = s.get_player(7)
+    var before: Dictionary = player.modifiers.duplicate(true)
+    s.step(Command.new())
+    for category: String in ["KARMA", "RESONANCE"]:
+        var properties: Dictionary = s.catalog.get_definition(String(before[category]["id"]))["properties"]
+        var expected: float = float(before[category]["energy"]) - float(properties["energy_drain"]) * Rules.TICK
+        if not is_equal_approx(float(player.modifiers[category]["energy"]), expected) or not is_equal_approx(float(player.modifiers[category]["time"]), float(before[category]["time"]) - Rules.TICK):
+            return false
+    player.modifiers["KARMA"]["energy"] = 0.00001
+    s.step(Command.new())
+    return not player.modifiers.has("KARMA") and player.modifiers.has("RESONANCE") and float(player.modifiers["RESONANCE"]["energy"]) > 0.0
+
+func _technique_consumes_separate_reserves() -> bool:
+    var s: RefCounted = fixture()
+    s.activate_modifier(7, "tempest_karma")
+    s.activate_modifier(7, "twin_resonance", 10)
+    var player: IEGPlayerState = s.get_player(7)
+    var before: Dictionary = player.modifiers.duplicate(true)
+    var energy: float = player.energy
+    s._pay_technique(player, "drift")
+    for category: String in ["KARMA", "RESONANCE"]:
+        var properties: Dictionary = s.catalog.get_definition(String(before[category]["id"]))["properties"]
+        var expected: float = float(before[category]["energy"]) - float(properties.get("technique_energy_cost", 0.0))
+        if not is_equal_approx(float(player.modifiers[category]["energy"]), expected):
+            return false
+    return is_equal_approx(player.energy, energy - float(s.catalog.get_definition("drift")["cost"])) and float(player.modifiers["KARMA"]["energy"]) < float(before["KARMA"]["energy"])
+
+func _modifier_bonuses_stack() -> bool:
+    var karma: RefCounted = fixture()
+    var resonance: RefCounted = fixture()
+    var both: RefCounted = fixture()
+    karma.activate_modifier(7, "tempest_karma")
+    resonance.activate_modifier(7, "twin_resonance", 10)
+    both.activate_modifier(7, "tempest_karma")
+    both.activate_modifier(7, "twin_resonance", 10)
+    var karma_bonus: float = karma._modifier_bonus(karma.get_player(7))
+    var resonance_bonus: float = resonance._modifier_bonus(resonance.get_player(7))
+    var both_bonus: float = both._modifier_bonus(both.get_player(7))
+    return karma_bonus > 0.0 and resonance_bonus > 0.0 and is_equal_approx(both_bonus, karma_bonus + resonance_bonus)
+
+func _speed_fixture(karma: bool, resonance: bool) -> RefCounted:
+    var s: RefCounted = fixture()
+    s.get_player(7).profile.run_speed = 5.0
+    s.get_player(7).profile.sprint_speed = 8.0
+    s.get_player(10).profile.run_speed = 10.0
+    s.get_player(10).profile.sprint_speed = 12.0
+    if karma:
+        s.activate_modifier(7, "tempest_karma")
+    if resonance:
+        s.activate_modifier(7, "twin_resonance", 10)
+    var c: IEGGameCommand = Command.new()
+    c.move = Vector2.RIGHT
+    s.step(c)
+    return s
+
+func _modifier_speed_bonuses_stack() -> bool:
+    var base: RefCounted = _speed_fixture(false, false)
+    var karma: RefCounted = _speed_fixture(true, false)
+    var resonance: RefCounted = _speed_fixture(false, true)
+    var both: RefCounted = _speed_fixture(true, true)
+    return karma.get_player(7).velocity.x > base.get_player(7).velocity.x and resonance.get_player(7).velocity.x > base.get_player(7).velocity.x and both.get_player(7).velocity.x > karma.get_player(7).velocity.x and both.get_player(7).velocity.x > resonance.get_player(7).velocity.x
+
+func _restart_preserves_both_modifiers() -> bool:
+    var s: RefCounted = fixture()
+    s.activate_modifier(7, "tempest_karma")
+    s.activate_modifier(7, "twin_resonance", 10)
+    s.get_player(7).modifiers["KARMA"]["energy"] = 33.0
+    s.get_player(7).modifiers["RESONANCE"]["energy"] = 66.0
+    var before: String = JSON.stringify(s.get_player(7).modifiers)
+    s._reset_positions()
+    return JSON.stringify(s.get_player(7).modifiers) == before and s.get_active_modifiers(7).size() == 2
+
+func _halftime_preserves_both_modifiers() -> bool:
+    var s: RefCounted = fixture()
+    s.activate_modifier(7, "tempest_karma")
+    s.activate_modifier(7, "twin_resonance", 10)
+    halftime(s)
+    var before: String = JSON.stringify(s.get_player(7).modifiers)
+    s.start_second_half()
+    return JSON.stringify(s.get_player(7).modifiers) == before and s.get_active_modifiers(7).size() == 2 and s.period == 2
+
+func _modifiers_snapshot_isolated() -> bool:
+    var s: RefCounted = fixture()
+    s.activate_modifier(7, "tempest_karma")
+    s.activate_modifier(7, "twin_resonance", 10)
+    var snapshot: Dictionary = s.make_snapshot()
+    var state: Dictionary = {}
+    for item: Dictionary in snapshot["players"]:
+        if item["id"] == 7:
+            state = item
+            break
+    if not state.has("modifiers") or not state["modifiers"].has("KARMA") or not state["modifiers"].has("RESONANCE"):
+        return false
+    state["modifiers"]["KARMA"]["energy"] = 0.0
+    state["modifiers"]["RESONANCE"]["time"] = 0.0
+    var active: Array = s.get_active_modifiers(7)
+    active[0]["energy"] = 0.0
+    return float(s.get_player(7).modifiers["KARMA"]["energy"]) > 0.0 and float(s.get_player(7).modifiers["RESONANCE"]["time"]) > 0.0 and JSON.parse_string(JSON.stringify(snapshot)) is Dictionary
+
+func _modifier_team_caps_independent() -> bool:
+    var s: RefCounted = modifier_fixture()
+    for id: int in [27, 28, 29]:
+        s.get_player(id).modifiers = {
+            "KARMA": {"id": "tempest_karma", "time": 30.0, "energy": 100.0, "energy_max": 100.0, "partner_id": -1},
+            "RESONANCE": {"id": "twin_resonance", "time": 45.0, "energy": 100.0, "energy_max": 100.0, "partner_id": 30},
+        }
+    for id: int in [7, 8, 9]:
+        if not s.activate_modifier(id, "tempest_karma") or not s.activate_modifier(id, "twin_resonance", 10):
+            return false
+    return s.count_active_modifiers(0, "KARMA") == 3 and s.count_active_modifiers(0, "RESONANCE") == 3 and s.count_active_modifiers(1, "KARMA") == 3 and s.count_active_modifiers(1, "RESONANCE") == 3
+
+func _enemy_activation_rejected() -> bool:
+    var s: RefCounted = modifier_fixture()
+    return not s.activate_modifier(27, "tempest_karma") and not s.activate_modifier(27, "twin_resonance", 30) and s.get_active_modifiers(27).is_empty() and s.get_player(27).energy == 100.0

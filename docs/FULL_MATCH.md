@@ -8,7 +8,7 @@ Godot **standard 4.7 stable**, GDScript uniquement. Ouvrir `project.godot` et F5
 
 La scène construit un terrain de **60 × 90 m**, deux équipes de **11 joueurs**, deux buts de 7,32 × 2,44 m, les tribunes et les marquages. Les profils du match sont indépendants de ceux de l'entraînement ; les GLB existants sont conservés. Les camps sont inversés en seconde période, y compris les buts, le placement des gardiens, les déviations et l'attribution des scores.
 
-Deux mi-temps de **180 secondes de jeu** par défaut. Modifier `half_seconds` sur la racine de la scène pour une autre durée. Le chrono s'arrête pendant les choix, les cinématiques, les menus, les remises en place et la mi-temps. Il repart avec le jeu live. À la fin, l'écran affiche le score et l'équipe gagnante, ou le match nul ; il propose de rejouer.
+Deux mi-temps de **300 secondes de jeu** par défaut. Modifier `half_seconds` sur la racine de la scène pour une autre durée. Le chrono s'arrête pendant les choix, les cinématiques, les menus, les remises en place et la mi-temps. Il repart avec le jeu live. À la fin, l'écran affiche le score et l'équipe gagnante, ou le match nul ; il propose de rejouer.
 
 | Action | Manette | Clavier / souris |
 | --- | --- | --- |
@@ -61,16 +61,16 @@ La mi-temps propose, pour chaque équipe, une disposition équilibrée, large ou
 
 Les deux techniques GAR partagent strictement leur préparation entre réussite et échec, puis divergent lorsque les scores apparaissent. Une capture, une déviation réussie et un but reçu ont des fins visuelles distinctes. Les modèles, os, caméras, décorations et visibilité du ballon sont restaurés après chaque cinématique. Les effets lisent la couleur, la famille visuelle et la puissance du catalogue ; la durée de présentation est bornée entre 1,8 et 10 secondes.
 
-Les contenus sauvegardés sont des overrides dans `user://match_content.json`, hors des fichiers source. En cloud Linux, le dossier utilisateur est sous `/workspace/.local/share/godot/app_userdata/`. Ils sont rechargés au retour de l'atelier. La prévisualisation simplifiée de l'atelier sert à éditer les paramètres ; `scenes/duel_preview.tscn` montre les gestes complets sur les personnages, avec bascule réussite/échec et parcours automatique.
+Les contenus sauvegardés sont des overrides dans `user://match_content.json`, hors des fichiers source. En cloud Linux, le dossier utilisateur est sous `/workspace/.local/share/godot/app_userdata/`. Ils sont rechargés au retour de l'atelier. Les sauvegardes de l’ancien système Écho sont migrées vers Karma à la lecture, sans perdre les paramètres personnalisés ; le format courant est réécrit à la prochaine sauvegarde explicite. La prévisualisation simplifiée de l'atelier sert à éditer les paramètres ; `scenes/duel_preview.tscn` montre les gestes complets sur les personnages, avec bascule réussite/échec et parcours automatique.
 
 Deux tactiques sont incluses : **Ailes ouvertes** (largeur et soutien) et **Étau collectif** (bloc compact et pression). Leurs propriétés agissent sur le placement IA.
 
-Les analogues portent les noms provisoires **Écho** et **Résonance** :
+Les deux systèmes se nomment **Karma** et **Resonance** :
 
-- **Écho : Vigie des vents** : renforcement temporaire, réserve propre qui se vide en jeu et lors des techniques ; puissance supplémentaire et légère accélération.
-- **Résonance : Double impulsion** : association temporaire avec un partenaire allié, pondération des profils et bonus d'affrontement. La vitesse tient compte du profil partenaire. L'association est refusée sans partenaire valide.
+- **Karma : Vigie des vents** : renforcement temporaire, réserve propre qui se vide en jeu et lors des techniques ; puissance supplémentaire et légère accélération.
+- **Resonance : Double impulsion** : association temporaire avec un partenaire allié, pondération des profils et bonus d'affrontement. La vitesse tient compte du profil partenaire. L'association est refusée sans partenaire valide.
 
-Ces deux états sont exclusifs sur un même joueur. Ils sont éditables comme les tactiques et les techniques. Il s'agit de variantes propres au prototype, pas d'une reproduction complète des systèmes des jeux de référence.
+Un joueur peut **cumuler Karma et Resonance**, avec une réserve et une durée indépendantes pour chacun. Chaque équipe peut maintenir **3 Karmas et 3 Resonance au maximum**, soit jusqu’à six états actifs répartis sur trois à six joueurs. Une seconde activation de la même famille sur un joueur déjà actif et une quatrième activation dans l’équipe sont refusées sans dépense ni remise à zéro. L’expiration ou l’épuisement d’un état libère uniquement sa place, sans supprimer l’autre famille. Les compteurs sont affichés pour les deux équipes. Ces états sont éditables comme les tactiques et les techniques. Il s'agit de variantes propres au prototype, pas d'une reproduction complète des systèmes des jeux de référence.
 
 ## Architecture et validation exécutée
 
@@ -90,7 +90,7 @@ bash tools/validate.sh
 "$GODOT_BIN" --headless --path . res://scenes/content_editor.tscn --quit-after 120
 ```
 
-Résultats Godot `4.7.stable.official.5b4e0cb0f` : **238/238 tests natifs** (87 historiques, 57 match, 25 catalogue, 69 cinématiques), **27/27 contrôles de la vraie scène de match**, **12/12 contrôles scène/entrées de l'entraînement**, **7/7 diagnostics de l'entraînement**. Import, démarrages et `git diff --check` réussis, sans erreur moteur/script. Les tests parcourent notamment deux périodes complètes sans saut du chrono, le gel des duels, les coûts, les changements de camp et les deux déviations physiques de seconde période.
+Résultats Godot `4.7.stable.official.5b4e0cb0f` : **265/265 tests natifs** (87 historiques, 76 match, 33 catalogue, 69 cinématiques), **32/32 contrôles de la vraie scène de match**, **12/12 contrôles scène/entrées de l'entraînement**, **7/7 diagnostics de l'entraînement**. Import, démarrages et `git diff --check` réussis, sans erreur moteur/script. Les tests parcourent notamment deux périodes complètes sans saut du chrono, le gel des duels, les coûts, les changements de camp et les deux déviations physiques de seconde période.
 
 Le rendu réel OpenGL 4.5/Mesa llvmpipe a été exécuté sous Xvfb : terrain, atelier, choix de duel, révélation et huit familles d'effets inspectés. Le pilote signale seulement que VSync n'est pas pris en charge. Ces vérifications graphiques ne mesurent pas les performances sur le GPU d'un joueur.
 

@@ -4,11 +4,13 @@ extends IEGTrainingSession
 const Catalog = preload("res://core/content/technique_catalog.gd")
 
 enum Phase { LIVE, DUEL_CHOICE, CINEMATIC, HALFTIME, FINISHED }
+const MODIFIER_LIMIT_PER_TEAM: int = 3
+const MODIFIER_CATEGORIES: Array[String] = ["KARMA", "RESONANCE"]
 const CHOICES: Array[String] = ["left", "right", "special"]
 var phase: Phase = Phase.LIVE
 var period: int = 1
 var elapsed_half: float = 0.0
-var half_duration: float = 180.0
+var half_duration: float = 300.0
 var team_names: Array[String] = ["Azur", "Carmin"]
 var winner_team: int = -1
 var duel: Dictionary = {}
@@ -16,6 +18,7 @@ var cinematic_elapsed: float = 0.0
 var formations: Dictionary = {0: "balanced", 1: "balanced"}
 var tactics: Dictionary = {0: "", 1: ""}
 var tactic_time: Dictionary = {0: 0.0, 1: 0.0}
+var modifier_error: String = ""
 var catalog: IEGTechniqueCatalog = Catalog.new()
 var _base_spawns: Dictionary = {}
 var _duel_cooldown: float = 0.0
@@ -26,9 +29,9 @@ var _shot_technique: String = ""
 var _shot_charge: float = 0.0
 
 func _init(profiles: Array[IEGPlayerProfile] = [], starts: Array[Vector2] = [],
-        teams: Array[int] = [], keeper_roles: Array[bool] = [], half_seconds: float = 180.0) -> void:
+        teams: Array[int] = [], keeper_roles: Array[bool] = [], half_seconds: float = 300.0) -> void:
     super(profiles, starts, teams, keeper_roles, Vector2(30.0, 45.0))
-    half_duration = clampf(half_seconds, 0.1, 2700.0) if is_finite(half_seconds) else 180.0
+    half_duration = clampf(half_seconds, 0.1, 2700.0) if is_finite(half_seconds) else 300.0
     goal_half_width = 3.66
     goal_height = 2.44
     for player: IEGPlayerState in players:
@@ -308,15 +311,16 @@ func _advance_players(commands: Dictionary) -> void:
     var frozen: Dictionary = {}
     for player: IEGPlayerState in players:
         player.speed_multiplier = 1.0
-        if not player.modifier_id.is_empty():
-            var definition: Dictionary = catalog.get_definition(player.modifier_id)
-            if definition.get("category", "") == "RESONANCE":
-                var partner: IEGPlayerState = get_player(player.modifier_partner_id)
+        # Les pondérations de profil et le bonus de Karma se composent.
+        for modifier: Dictionary in get_active_modifiers(player.get_id()):
+            var definition: Dictionary = catalog.get_definition(String(modifier["id"]))
+            if modifier["category"] == "RESONANCE":
+                var partner: IEGPlayerState = get_player(int(modifier.get("partner_id", -1)))
                 if partner != null:
                     var blend: float = float(definition.get("properties", {}).get("blend", 0.5))
-                    player.speed_multiplier = lerpf(player.profile.run_speed, partner.profile.run_speed, blend) / player.profile.run_speed
-            else:
-                player.speed_multiplier = 1.08
+                    player.speed_multiplier *= lerpf(player.profile.run_speed, partner.profile.run_speed, blend) / player.profile.run_speed
+            elif modifier["category"] == "KARMA":
+                player.speed_multiplier *= 1.08
         if player.dazed_time > 0.0:
             frozen[player.get_id()] = player.position
             player.velocity = Vector2.ZERO
@@ -394,8 +398,7 @@ func _reset_positions() -> void:
     var saved: Dictionary = {}
     if _initialized:
         for player: IEGPlayerState in players:
-            saved[player.get_id()] = [player.energy, player.keeper_stamina, player.modifier_id,
-                player.modifier_time, player.modifier_energy, player.modifier_partner_id]
+            saved[player.get_id()] = [player.energy, player.keeper_stamina, player.modifiers.duplicate(true)]
     super._reset_positions()
     for player: IEGPlayerState in players:
         player.facing = Vector2(0.0, attack_direction(player.team_id))
@@ -403,10 +406,7 @@ func _reset_positions() -> void:
             var state: Array = saved[player.get_id()]
             player.energy = float(state[0])
             player.keeper_stamina = float(state[1])
-            player.modifier_id = String(state[2])
-            player.modifier_time = float(state[3])
-            player.modifier_energy = float(state[4])
-            player.modifier_partner_id = int(state[5])
+            player.modifiers = state[2].duplicate(true)
     var kicker: IEGPlayerState = null
     for player: IEGPlayerState in players:
         if player.team_id == _next_kickoff_team and not player.is_goalkeeper:
@@ -438,9 +438,16 @@ func _pay_technique(actor: IEGPlayerState, id: String) -> void:
         actor.keeper_stamina = maxf(0.0, actor.keeper_stamina - cost)
     else:
         actor.energy = maxf(0.0, actor.energy - cost)
-    if not actor.modifier_id.is_empty():
-        var modifier: Dictionary = catalog.get_definition(actor.modifier_id)
-        actor.modifier_energy = maxf(0.0, actor.modifier_energy - float(modifier.get("properties", {}).get("technique_energy_cost", 0.0)))
+    # Chaque famille ne débite que sa propre réserve, même lorsqu'elles se cumulent.
+    for category: String in MODIFIER_CATEGORIES:
+        var state: Dictionary = actor.modifiers.get(category, {})
+        if not _modifier_is_active(state):
+            continue
+        var definition: Dictionary = catalog.get_definition(String(state["id"]))
+        var extra: float = float(definition.get("properties", {}).get("technique_energy_cost", 0.0))
+        state["energy"] = maxf(0.0, float(state["energy"]) - extra)
+        if float(state["energy"]) <= 0.0:
+            actor.modifiers.erase(category)
 
 func _affordable_ai_technique(actor: IEGPlayerState, category: String) -> String:
     var definitions: Array[Dictionary] = catalog.definitions_for(category)
@@ -464,34 +471,78 @@ func set_tactic(team: int, id: String) -> bool:
     return true
 
 func activate_modifier(player_id: int, content_id: String, partner_id: int = -1) -> bool:
+    modifier_error = ""
     var player: IEGPlayerState = get_player(player_id)
-    if phase != Phase.LIVE or player == null or player.team_id != LOCAL_TEAM or player.dazed_time > 0.0 or not player.modifier_id.is_empty():
-        return false
+    if phase != Phase.LIVE:
+        return _reject_modifier("Les augmentations s'activent pendant le jeu live.")
+    if player == null or player.team_id != LOCAL_TEAM:
+        return _reject_modifier("Choisissez un joueur de votre équipe.")
+    if player.dazed_time > 0.0:
+        return _reject_modifier("Ce joueur est encore inactif.")
     var definition: Dictionary = catalog.get_definition(content_id)
     var category: String = String(definition.get("category", ""))
-    if category not in ["ECHO", "RESONANCE"] or player.energy < float(definition.get("cost", 0.0)):
-        return false
-    var properties: Dictionary = definition.get("properties", {})
+    if category not in MODIFIER_CATEGORIES:
+        return _reject_modifier("Cette fiche n'est ni un Karma ni une Resonance.")
+    if _modifier_is_active(player.modifiers.get(category, {})):
+        return _reject_modifier("Ce joueur possède déjà un %s actif." % ("Karma" if category == "KARMA" else "état de Resonance"))
+    if count_active_modifiers(player.team_id, category) >= MODIFIER_LIMIT_PER_TEAM:
+        return _reject_modifier("Limite atteinte : 3 %s actifs dans cette équipe." % ("Karmas" if category == "KARMA" else "Resonance"))
+    var cost: float = float(definition.get("cost", 0.0))
+    if player.energy < cost:
+        return _reject_modifier("Endurance insuffisante pour cette activation.")
     if category == "RESONANCE":
         var partner: IEGPlayerState = get_player(partner_id)
         if partner == null or partner == player or partner.team_id != player.team_id or partner.dazed_time > 0.0:
-            return false
-    player.energy -= float(definition.get("cost", 0.0))
-    player.modifier_id = content_id
-    player.modifier_time = float(definition.get("duration", 20.0))
-    player.modifier_energy = float(properties.get("energy_max", 100.0))
-    player.modifier_partner_id = partner_id if category == "RESONANCE" else -1
+            return _reject_modifier("Choisissez un partenaire allié valide pour la Resonance.")
+    var properties: Dictionary = definition.get("properties", {})
+    var reserve: float = float(properties.get("energy_max", 100.0))
+    # Toutes les validations précèdent la dépense et la création d'état.
+    player.energy -= cost
+    player.modifiers[category] = {"id": String(definition["id"]),
+        "time": float(definition.get("duration", 20.0)), "energy": reserve,
+        "energy_max": reserve, "partner_id": partner_id if category == "RESONANCE" else -1}
     return true
 
+func _reject_modifier(reason: String) -> bool:
+    modifier_error = reason
+    return false
+
+func _modifier_is_active(state: Dictionary) -> bool:
+    return not state.is_empty() and float(state.get("time", 0.0)) > 0.0000001 and float(state.get("energy", 0.0)) > 0.0000001
+
+func get_active_modifiers(player_id: int) -> Array[Dictionary]:
+    var result: Array[Dictionary] = []
+    var player: IEGPlayerState = get_player(player_id)
+    if player == null:
+        return result
+    for category: String in MODIFIER_CATEGORIES:
+        var state: Dictionary = player.modifiers.get(category, {})
+        if _modifier_is_active(state):
+            var entry: Dictionary = state.duplicate(true)
+            entry["category"] = category
+            result.append(entry)
+    return result
+
+func count_active_modifiers(team: int, category: String) -> int:
+    # Ancien nom accepté en lecture, sans réintroduire une troisième famille.
+    category = "KARMA" if category == "ECHO" else category
+    if team not in [0, 1] or category not in MODIFIER_CATEGORIES:
+        return 0
+    var count: int = 0
+    for player: IEGPlayerState in players:
+        if player.team_id == team and _modifier_is_active(player.modifiers.get(category, {})):
+            count += 1
+    return count
+
 func _modifier_bonus(player: IEGPlayerState) -> float:
-    if player.modifier_id.is_empty() or player.modifier_time <= 0.0 or player.modifier_energy <= 0.0:
-        return 0.0
-    var definition: Dictionary = catalog.get_definition(player.modifier_id)
-    var bonus: float = float(definition.get("power", 0.0))
-    if definition.get("category", "") == "RESONANCE":
-        var partner: IEGPlayerState = get_player(player.modifier_partner_id)
-        if partner != null:
-            bonus += partner.energy * float(definition.get("properties", {}).get("blend", 0.5)) * 0.1
+    var bonus: float = 0.0
+    for modifier: Dictionary in get_active_modifiers(player.get_id()):
+        var definition: Dictionary = catalog.get_definition(String(modifier["id"]))
+        bonus += float(definition.get("power", 0.0))
+        if modifier["category"] == "RESONANCE":
+            var partner: IEGPlayerState = get_player(int(modifier.get("partner_id", -1)))
+            if partner != null:
+                bonus += partner.energy * float(definition.get("properties", {}).get("blend", 0.5)) * 0.1
     return bonus
 
 func _advance_modifiers() -> void:
@@ -500,14 +551,15 @@ func _advance_modifiers() -> void:
         if float(tactic_time[team]) <= 0.0:
             tactics[team] = ""
     for player: IEGPlayerState in players:
-        if player.modifier_id.is_empty():
-            continue
-        var definition: Dictionary = catalog.get_definition(player.modifier_id)
-        player.modifier_time = maxf(0.0, player.modifier_time - Rules.TICK)
-        player.modifier_energy = maxf(0.0, player.modifier_energy - float(definition.get("properties", {}).get("energy_drain", 1.0)) * Rules.TICK)
-        if player.modifier_time <= 0.0 or player.modifier_energy <= 0.0:
-            player.modifier_id = ""
-            player.modifier_partner_id = -1
+        for category: String in MODIFIER_CATEGORIES:
+            var state: Dictionary = player.modifiers.get(category, {})
+            if state.is_empty():
+                continue
+            var definition: Dictionary = catalog.get_definition(String(state["id"]))
+            state["time"] = maxf(0.0, float(state["time"]) - Rules.TICK)
+            state["energy"] = maxf(0.0, float(state["energy"]) - float(definition.get("properties", {}).get("energy_drain", 1.0)) * Rules.TICK)
+            if not _modifier_is_active(state):
+                player.modifiers.erase(category)
 
 func build_ai_commands() -> Dictionary:
     var commands: Dictionary = {}
@@ -566,8 +618,7 @@ func make_snapshot() -> Dictionary:
     for index: int in range(players.size()):
         var player: IEGPlayerState = players[index]
         snapshot["players"][index].merge({"dazed_time": player.dazed_time,
-            "keeper_stamina": player.keeper_stamina, "modifier_id": player.modifier_id,
-            "modifier_time": player.modifier_time, "modifier_energy": player.modifier_energy}, true)
+            "keeper_stamina": player.keeper_stamina, "modifiers": player.modifiers.duplicate(true)}, true)
     return snapshot
 
 func _shot_blocker(shooter: IEGPlayerState) -> IEGPlayerState:

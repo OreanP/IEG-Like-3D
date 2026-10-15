@@ -28,10 +28,11 @@ var _help: Label
 var _message: Label
 var _energy: ProgressBar
 var _charge: ProgressBar
-var _modifier_label: Label
-var _modifier_energy: ProgressBar
+var _modifier_labels: Dictionary = {}
+var _modifier_bars: Dictionary = {}
 var _keeper_bars: Array[ProgressBar] = []
 var _keeper_labels: Array[Label] = []
+var _team_modifier_counts: Array[Label] = []
 var _overlay: ColorRect
 var _column: VBoxContainer
 var _mode: String = ""
@@ -65,7 +66,7 @@ func _ready() -> void:
     var scores: VBoxContainer = _panel(Vector2(0.5, 0), Rect2(-220, 18, 440, 108))
     _score = _text(scores, "AZUR   0 — 0   CARMIN", 27, INK)
     _score.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    _clock = _text(scores, "1re MI-TEMPS  ·  03:00", 19, GOLD)
+    _clock = _text(scores, "1re MI-TEMPS  ·  05:00", 19, GOLD)
     _clock.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     var tools: VBoxContainer = _panel(Vector2(1, 0), Rect2(-250, 18, 230, 101))
     _live_panels.append(tools.get_parent())
@@ -74,7 +75,7 @@ func _ready() -> void:
     _button(row, "Pause", func(): pause_requested.emit(), 37)
     _button(row, "Atelier", func(): editor_requested.emit(), 37)
     _text(tools, "Start / Échap · V : actions", 13, MUTED)
-    var keeper_panel: VBoxContainer = _panel(Vector2(0.5, 0), Rect2(-220, 134, 440, 72))
+    var keeper_panel: VBoxContainer = _panel(Vector2(0.5, 0), Rect2(-230, 134, 460, 88))
     _live_panels.append(keeper_panel.get_parent())
     var keeper_row := HBoxContainer.new()
     keeper_row.add_theme_constant_override("separation", 24)
@@ -85,24 +86,29 @@ func _ready() -> void:
         keeper_row.add_child(keeper_column)
         _keeper_labels.append(_text(keeper_column, "Gardien " + ("Azur" if team == 0 else "Carmin"), 13, AQUA if team == 0 else Color("ff9d9a")))
         _keeper_bars.append(_bar(keeper_column, 100, AQUA if team == 0 else Color("ff9d9a")))
-    var player_panel: VBoxContainer = _panel(Vector2(0, 1), Rect2(20, -238, 332, 218))
+        _team_modifier_counts.append(_text(keeper_column, "Karma 0/3 · Resonance 0/3", 12, MUTED))
+    var player_panel: VBoxContainer = _panel(Vector2(0, 1), Rect2(20, -290, 332, 270))
     _live_panels.append(player_panel.get_parent())
     _player = _text(player_panel, "Joueur", 21, INK)
     _status = _text(player_panel, "Endurance", 13, MUTED)
     _energy = _bar(player_panel, 100, GOLD)
     _charge = _bar(player_panel, 1, AQUA)
-    _modifier_label = _text(player_panel, "", 13, AQUA)
-    _modifier_energy = _bar(player_panel, 100, AQUA)
-    _modifier_label.visible = false
-    _modifier_energy.visible = false
+    for category: String in ["KARMA", "RESONANCE"]:
+        var color: Color = AQUA if category == "KARMA" else Color("c3a2ff")
+        var modifier_label: Label = _text(player_panel, "", 13, color)
+        var modifier_bar: ProgressBar = _bar(player_panel, 100, color)
+        _modifier_labels[category] = modifier_label
+        _modifier_bars[category] = modifier_bar
+        modifier_label.visible = false
+        modifier_bar.visible = false
     var player_tools := HBoxContainer.new()
     player_panel.add_child(player_tools)
     _button(player_tools, "Techniques", func(): open_actions("TIR"), 32)
     _button(player_tools, "Tactique", func(): open_actions("TAC"), 32)
     var modifiers := HBoxContainer.new()
     player_panel.add_child(modifiers)
-    _button(modifiers, "Écho", func(): open_actions("ECHO"), 30)
-    _button(modifiers, "Résonance", func(): open_actions("RESONANCE"), 30)
+    _button(modifiers, "Karma", func(): open_actions("KARMA"), 30)
+    _button(modifiers, "Resonance", func(): open_actions("RESONANCE"), 30)
     var help_panel: VBoxContainer = _panel(Vector2.ONE, Rect2(-485, -177, 465, 157))
     _live_panels.append(help_panel.get_parent())
     _help = _text(help_panel, "", 14, INK)
@@ -179,17 +185,14 @@ func refresh(delta: float, session, controls: IEGLocalPlayerInput, paused: bool)
     _energy.value = player.energy
     _charge.visible = controls.charge > 0
     _charge.value = controls.charge
-    var modifier: String = str(player.get("modifier_id"))
-    _modifier_label.visible = not modifier.is_empty()
-    _modifier_energy.visible = not modifier.is_empty()
-    if not modifier.is_empty():
-        _modifier_label.text = "%s · %.0f s · réserve" % [_name_for_id(modifier), float(player.get("modifier_time"))]
-        _modifier_energy.value = float(player.get("modifier_energy"))
+    _refresh_modifiers(session, player)
     for state: IEGPlayerState in session.players:
         if state.is_goalkeeper:
             var value: float = float(state.get("keeper_stamina"))
             _keeper_bars[state.team_id].value = value
             _keeper_labels[state.team_id].text = "Gardien %s · %d / 100" % [session.team_names[state.team_id], roundi(value)]
+    for team: int in range(2):
+        _team_modifier_counts[team].text = "Karma %d/3 · Resonance %d/3" % [session.count_active_modifiers(team, "KARMA"), session.count_active_modifiers(team, "RESONANCE")]
     _help.text = ("Stick G : déplacement · RT : sprint\nA : passe · Y : lob · X : tir chargé · B : tacle\nRB : cible · LB : joueur · Stick D : caméra\nL3 / V : techniques et tactiques · Start : pause"
         if controls.uses_gamepad else "ZQSD / WASD : mouvement · Maj : sprint\nEspace : passe · G : lob · E : tacle · Q : cible\nF / clic G : tir chargé · Tab : joueur\nClic D : caméra · V : actions · Échap : pause")
     _message_life = maxf(0, _message_life - delta)
@@ -247,7 +250,7 @@ func _show_pause() -> void:
     var first: Button = _button(_column, "Reprendre le match", func(): resume_requested.emit())
     _button(_column, "Techniques de tir", func(): open_actions("TIR"))
     _button(_column, "Tactiques collectives", func(): open_actions("TAC"))
-    _button(_column, "Écho / Résonance", func(): open_actions("ECHO"))
+    _button(_column, "Karma / Resonance", func(): open_actions("KARMA"))
     _button(_column, "Ouvrir l'atelier des techniques", func(): editor_requested.emit())
     _button(_column, "Retour au terrain d'entraînement", func(): training_requested.emit())
     first.grab_focus()
@@ -343,8 +346,12 @@ func open_actions(category: String = "TIR") -> void:
     if _session == null or _session.phase != _session.Phase.LIVE:
         return
     menu_opened.emit()
-    var names: Dictionary = {"TIR": "TECHNIQUES DE TIR", "TAC": "TACTIQUES", "ECHO": "ÉCHO", "RESONANCE": "RÉSONANCE"}
-    _reset_overlay("actions_" + category, str(names.get(category, category)), "Le chrono est arrêté pendant ce choix.")
+    var names: Dictionary = {"TIR": "TECHNIQUES DE TIR", "TAC": "TACTIQUES", "KARMA": "Karma", "RESONANCE": "Resonance"}
+    var description: String = "Le chrono est arrêté pendant ce choix."
+    if category in ["KARMA", "RESONANCE"]:
+        description += "\nKarma et Resonance peuvent se cumuler sur un joueur.\nTrois Karma et trois Resonance maximum par équipe."
+        description += "\nActifs dans votre équipe : Karma %d/3 · Resonance %d/3" % [_session.count_active_modifiers(0, "KARMA"), _session.count_active_modifiers(0, "RESONANCE")]
+    _reset_overlay("actions_" + category, str(names.get(category, category)), description)
     var first: Button = null
     for definition: Dictionary in _for_category(category):
         var id: String = str(definition.get("id", ""))
@@ -354,8 +361,10 @@ func open_actions(category: String = "TIR") -> void:
         _description(definition)
     if first == null:
         _text(_column, "Aucune entrée disponible dans cette catégorie.", 18, MUTED)
-    if category == "ECHO":
-        _button(_column, "Voir les Résonances", func(): open_actions("RESONANCE"))
+    if category == "KARMA":
+        _button(_column, "Voir les Resonance", func(): open_actions("RESONANCE"))
+    elif category == "RESONANCE":
+        _button(_column, "Voir les Karma", func(): open_actions("KARMA"))
     var back: Button = _button(_column, "Reprendre le match", func(): resume_requested.emit())
     (first if first != null else back).grab_focus()
 
@@ -372,6 +381,34 @@ func _for_category(category: String) -> Array[Dictionary]:
         if str(definition.get("category", "")) == category:
             result.append(definition)
     return result
+
+func _refresh_modifiers(session, player: IEGPlayerState) -> void:
+    for category: String in _modifier_labels:
+        _modifier_labels[category].visible = false
+        _modifier_bars[category].visible = false
+    for modifier: Dictionary in session.get_active_modifiers(player.get_id()):
+        var category: String = str(modifier.get("category", ""))
+        if not _modifier_labels.has(category):
+            continue
+        var label: Label = _modifier_labels[category]
+        var bar: ProgressBar = _modifier_bars[category]
+        var name: String = "Karma" if category == "KARMA" else "Resonance"
+        var id: String = str(modifier.get("id", ""))
+        var remaining: int = maxi(0, ceili(float(modifier.get("time", 0))))
+        var energy: float = maxf(0, float(modifier.get("energy", 0)))
+        label.text = "%s · %02d:%02d · %.0f réserve" % [name, remaining / 60, remaining % 60, energy]
+        label.tooltip_text = _name_for_id(id)
+        bar.max_value = _modifier_max_energy(id)
+        bar.value = energy
+        label.visible = true
+        bar.visible = true
+
+func _modifier_max_energy(id: String) -> float:
+    for definition: Dictionary in _definitions:
+        if str(definition.get("id", "")) == id:
+            var properties: Dictionary = definition.get("properties", {})
+            return maxf(1.0, float(properties.get("energy_max", 100.0)))
+    return 100.0
 
 func _definition_name(definition: Dictionary) -> String:
     return str(definition.get("name", definition.get("display_name", definition.get("id", "Technique"))))
@@ -435,8 +472,14 @@ func _bar(parent: Node, maximum: float, color: Color) -> ProgressBar:
     bar.value = maximum
     bar.show_percentage = false
     bar.custom_minimum_size = Vector2(0, 9)
-    bar.add_theme_stylebox_override("background", _style(Color("233a48")))
-    bar.add_theme_stylebox_override("fill", _style(color))
+    var background := StyleBoxFlat.new()
+    background.bg_color = Color("233a48")
+    background.set_corner_radius_all(4)
+    var fill := StyleBoxFlat.new()
+    fill.bg_color = color
+    fill.set_corner_radius_all(4)
+    bar.add_theme_stylebox_override("background", background)
+    bar.add_theme_stylebox_override("fill", fill)
     parent.add_child(bar)
     return bar
 

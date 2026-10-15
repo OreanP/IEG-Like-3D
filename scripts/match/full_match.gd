@@ -9,7 +9,7 @@ const PlayerScene = preload("res://scenes/characters/player_view.tscn")
 const Command = preload("res://core/game_command.gd")
 const Rules = preload("res://core/training_rules.gd")
 
-@export_range(10.0, 2700.0, 1.0) var half_seconds: float = 180.0
+@export_range(10.0, 2700.0, 1.0) var half_seconds: float = 300.0
 @export_range(0.05, 0.45, 0.01) var stick_deadzone: float = 0.22
 @export_range(0.0005, 0.01, 0.0005) var mouse_sensitivity: float = 0.003
 @export_range(0.5, 5.0, 0.1) var stick_camera_speed: float = 2.25
@@ -312,15 +312,20 @@ func _activate_modifier(id: String) -> void:
     var partner: int = -1
     var definition: Dictionary = _catalogue.get_definition(id)
     if str(definition.get("category", "")) == "RESONANCE":
+        var properties: Dictionary = definition.get("properties", {})
+        var profile_a: int = int(properties.get("profile_a", 7))
+        var profile_b: int = int(properties.get("profile_b", 10))
+        var preferred: int = profile_b if session.controlled_id == profile_a else profile_a
         for state: IEGPlayerState in session.players:
             if state.team_id == 0 and state.get_id() != session.controlled_id and not state.is_goalkeeper:
                 partner = state.get_id()
-                if state.get_id() == 10:
+                if state.get_id() == preferred:
                     break
     if session.activate_modifier(session.controlled_id, id, partner):
         hud.show_message("Activation : " + str(definition.get("name", id)))
     else:
-        hud.show_message("Activation indisponible : énergie ou partenaire incompatible.")
+        var reason: String = str(session.modifier_error)
+        hud.show_message(reason if not reason.is_empty() else "Activation refusée : vérifiez l'énergie et le partenaire.", 5.0)
 
 func _rematch() -> void:
     _paused = false

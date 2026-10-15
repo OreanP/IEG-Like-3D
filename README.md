@@ -1,10 +1,10 @@
 # IEG-Like-3D
 
-Première base d'entraînement football en **Godot standard 4.7 stable**, GDScript uniquement. La scène existante conserve le terrain et les modèles GLB ; elle assemble trois joueurs de champ bleus, deux rouges et un gardien par camp. Ce n'est pas le jeu complet ni un match à onze.
+Prototype de football en **Godot standard 4.7 stable**, GDScript uniquement : match **11 contre 11, deux mi-temps de cinq minutes**, duels et techniques spéciales. Le terrain d’entraînement et les modèles GLB existants sont conservés.
 
 Ouvrir `project.godot`, attendre l'importation, puis **F5 pour le match complet de test** : 11 contre 11, terrain 60×90 m, deux mi-temps réglables, duels à temps arrêté, huit techniques et atelier d'édition. Voir [docs/FULL_MATCH.md](docs/FULL_MATCH.md) pour les règles, les scènes et les résultats de validation. Le terrain d'entraînement reste accessible par le menu ou en ouvrant `scenes/training_ground.tscn` puis F6.
 
-**V / L3** ouvre les actions du match : techniques de tir, tactiques, Écho et Résonance. Le bouton **Atelier** ouvre l'éditeur sans perdre le match. À la mi-temps, choisir la disposition de chaque équipe puis reprendre. `scenes/duel_preview.tscn` permet de revoir les huit animations et les deux issues gardien.
+**V / L3** ouvre les actions du match : techniques de tir, tactiques, Karma et Resonance. Karma et Resonance sont cumulables sur un joueur, avec au maximum **3 Karmas et 3 Resonance par équipe**, des réserves et des durées indépendantes. Le bouton **Atelier** ouvre l'éditeur sans perdre le match. À la mi-temps, choisir la disposition de chaque équipe puis reprendre. `scenes/duel_preview.tscn` permet de revoir les huit animations et les deux issues gardien.
  La scène `scenes/diagnostic.tscn` (F6) reproduit sept situations ; F2, pavé directionnel gauche ou le bouton affiché change de scénario.
 
 | Action | Manette Xbox / PlayStation | Clavier-souris |
@@ -35,6 +35,6 @@ bash tools/cloud_setup.sh
 bash tools/validate.sh
 ```
 
-`cloud_setup.sh` installe Godot 4.7 depuis la distribution officielle en vérifiant SHA-512, puis importe le projet. `validate.sh` exécute les 238 tests natifs, les 27 vérifications de scène match, les 12 contrôles entraînement, les démarrages et les sept diagnostics. Pour utiliser une autre installation **4.7 stable** : `GODOT_BIN=/chemin/vers/godot bash tools/validate.sh`.
+`cloud_setup.sh` installe Godot 4.7 depuis la distribution officielle en vérifiant SHA-512, puis importe le projet. `validate.sh` exécute les 265 tests natifs, les 32 vérifications de scène match, les 12 contrôles entraînement, les démarrages et les sept diagnostics. Pour utiliser une autre installation **4.7 stable** : `GODOT_BIN=/chemin/vers/godot bash tools/validate.sh`.
 
 Résultats, contrats, fichiers concernés et limites : [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Les documents S0/S1 décrivent les livraisons historiques ; il n'est plus nécessaire d'appliquer leur diff d'intégration manuelle sur cette branche.

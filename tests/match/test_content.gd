@@ -11,7 +11,10 @@ func run_all() -> Dictionary:
         _malformed_load_preserves_memory, _missing_fields, _invalid_numbers,
         _invalid_category_color_and_properties, _tactics_bounds, _reset,
         _unsupported_schema, _empty_overrides, _strict_augmentation_validation,
-        _malformed_field_types, _invalid_presentation_properties, _oversized_save]
+        _malformed_field_types, _invalid_presentation_properties, _oversized_save,
+        _canonical_augmentation_names, _fixed_team_limits, _independent_budgets,
+        _legacy_karma_migration, _legacy_resonance_migration, _migration_save_roundtrip,
+        _legacy_alias_collision, _legacy_cannot_bypass_cap]
     var lines: Array[String] = []
     var passed: int = 0
     for test: Callable in cases:
@@ -82,9 +85,9 @@ func _tactics_parameters() -> bool:
 
 func _augmentation_contracts() -> bool:
     var c: IEGTechniqueCatalog = fixture()
-    var echo: Dictionary = c.get_definition("tempest_echo")["properties"]
+    var karma: Dictionary = c.get_definition("tempest_karma")["properties"]
     var resonance: Dictionary = c.get_definition("twin_resonance")["properties"]
-    return echo["exclusive_group"] == resonance["exclusive_group"] and float(echo["energy_max"]) > 0.0 and float(echo["energy_drain"]) > 0.0 and resonance["profile_a"] != resonance["profile_b"]
+    return not karma.has("exclusive_group") and not resonance.has("exclusive_group") and karma["max_active_per_team"] == 3 and resonance["max_active_per_team"] == 3 and float(karma["energy_max"]) > 0.0 and float(karma["energy_drain"]) > 0.0 and resonance["profile_a"] != resonance["profile_b"]
 
 func _keeper_branches() -> bool:
     for data: Dictionary in fixture().definitions_for("GAR"):
@@ -181,13 +184,13 @@ func _empty_overrides() -> bool:
 
 func _strict_augmentation_validation() -> bool:
     var c: IEGTechniqueCatalog = fixture()
-    var echo: Dictionary = c.get_definition("tempest_echo")
-    echo["properties"]["energy_max"] = -5.0
-    echo["properties"]["exclusive_group"] = "different"
+    var karma: Dictionary = c.get_definition("tempest_karma")
+    karma["properties"]["energy_max"] = -5.0
+    karma["properties"]["max_active_per_team"] = 4
     var resonance: Dictionary = c.get_definition("twin_resonance")
     resonance["properties"]["blend"] = 2.0
     resonance["properties"]["profile_b"] = resonance["properties"]["profile_a"]
-    return c.validate_definition(echo).size() == 2 and c.validate_definition(resonance).size() == 2
+    return c.validate_definition(karma).size() >= 2 and c.validate_definition(resonance).size() == 2
 
 func _malformed_field_types() -> bool:
     var c: IEGTechniqueCatalog = fixture()
@@ -196,8 +199,8 @@ func _malformed_field_types() -> bool:
     data["category"] = 4
     if c.save_overrides([data]) != ERR_INVALID_DATA or FileAccess.file_exists(_path):
         return false
-    data = c.get_definition("tempest_echo")
-    data["properties"]["exclusive_group"] = 7
+    data = c.get_definition("tempest_karma")
+    data["properties"]["max_active_per_team"] = "three"
     return not c.validate_definition(data).is_empty()
 
 func _invalid_presentation_properties() -> bool:
@@ -212,3 +215,103 @@ func _oversized_save() -> bool:
     var data: Dictionary = c.get_definition("drift")
     data["properties"]["too_large"] = "a".repeat(524288)
     return c.save_overrides([data]) == ERR_INVALID_DATA and not FileAccess.file_exists(_path)
+
+func _canonical_augmentation_names() -> bool:
+    var c: IEGTechniqueCatalog = fixture()
+    var karma: Dictionary = c.get_definition("tempest_karma")
+    var resonance: Dictionary = c.get_definition("twin_resonance")
+    if karma["category"] != "KARMA" or not String(karma["name"]).begins_with("Karma :") or not String(resonance["name"]).begins_with("Resonance :"):
+        return false
+    if c.get_definition("tempest_echo") != karma or not c.definitions_for("ECHO").is_empty():
+        return false
+    return c.definitions_for("KARMA").size() == 1 and c.all_definitions().size() == 12
+
+func _fixed_team_limits() -> bool:
+    var c: IEGTechniqueCatalog = fixture()
+    for id: String in ["tempest_karma", "twin_resonance"]:
+        for value: Variant in [4, 0, -1, 3.5, "3", true, NAN]:
+            var data: Dictionary = c.get_definition(id)
+            data["properties"]["max_active_per_team"] = value
+            if c.validate_definition(data).is_empty() or c.save_overrides([data]) != ERR_INVALID_DATA:
+                return false
+        var absent: Dictionary = c.get_definition(id)
+        absent["properties"].erase("max_active_per_team")
+        if c.validate_definition(absent).is_empty():
+            return false
+    return not FileAccess.file_exists(_path)
+
+func _independent_budgets() -> bool:
+    var c: IEGTechniqueCatalog = fixture()
+    for id: String in ["tempest_karma", "twin_resonance"]:
+        for property: String in ["energy_max", "energy_drain", "technique_energy_cost"]:
+            var data: Dictionary = c.get_definition(id)
+            data["properties"][property] = -1.0
+            if c.validate_definition(data).is_empty():
+                return false
+        var excessive: Dictionary = c.get_definition(id)
+        excessive["properties"]["technique_energy_cost"] = float(excessive["properties"]["energy_max"]) + 1.0
+        if c.validate_definition(excessive).is_empty():
+            return false
+    var karma: Dictionary = c.get_definition("tempest_karma")
+    var resonance: Dictionary = c.get_definition("twin_resonance")
+    karma["properties"]["energy_max"] = 160.0
+    resonance["properties"]["energy_max"] = 80.0
+    return c.save_overrides([karma, resonance]) == OK and fixture().get_definition("tempest_karma")["properties"]["energy_max"] == 160.0 and fixture().get_definition("twin_resonance")["properties"]["energy_max"] == 80.0
+
+func _legacy_karma(c: IEGTechniqueCatalog) -> Dictionary:
+    var legacy: Dictionary = c.get_definition("tempest_karma")
+    legacy["id"] = "tempest_echo"
+    legacy["name"] = "Écho : Vigie des vents"
+    legacy["category"] = "ECHO"
+    legacy["effect"] = "echo"
+    legacy["properties"].erase("max_active_per_team")
+    legacy["properties"]["exclusive_group"] = "augmentation"
+    return legacy
+
+func _legacy_karma_migration() -> bool:
+    var legacy: Dictionary = _legacy_karma(fixture())
+    legacy["name"] = "Mon contenu personnalisé"
+    legacy["description"] = "Description personnalisée conservée."
+    legacy["power"] = 41.0
+    legacy["cost"] = 13.0
+    legacy["duration"] = 88.0
+    legacy["properties"]["energy_max"] = 175.0
+    legacy["properties"]["technique_energy_cost"] = 24.0
+    var original: String = JSON.stringify({"schema_version": 1, "entries": [legacy]})
+    _write(original)
+    var c: IEGTechniqueCatalog = fixture()
+    var data: Dictionary = c.get_definition("tempest_karma")
+    return c.last_errors.is_empty() and not c.last_notices.is_empty() and data["id"] == "tempest_karma" and data["category"] == "KARMA" and data["effect"] == "karma" and data["name"] == legacy["name"] and data["description"] == legacy["description"] and data["power"] == 41.0 and data["cost"] == 13.0 and data["duration"] == 88.0 and data["properties"]["energy_max"] == 175.0 and data["properties"]["technique_energy_cost"] == 24.0 and data["properties"]["max_active_per_team"] == 3 and not data["properties"].has("exclusive_group") and c.get_definition("tempest_echo") == data and FileAccess.get_file_as_string(_path) == original
+
+func _legacy_resonance_migration() -> bool:
+    var legacy: Dictionary = fixture().get_definition("twin_resonance")
+    legacy["name"] = "Résonance : Double horizon"
+    legacy["properties"] = {"profile_a": 7, "profile_b": 10, "blend": 0.8, "exclusive_group": "augmentation"}
+    legacy["power"] = 19.0
+    legacy["cost"] = 21.0
+    _write(JSON.stringify({"schema_version": 1, "entries": [legacy]}))
+    var c: IEGTechniqueCatalog = fixture()
+    var data: Dictionary = c.get_definition("twin_resonance")
+    return c.last_errors.is_empty() and data["name"] == "Resonance : Double horizon" and data["power"] == 19.0 and data["cost"] == 21.0 and data["properties"]["blend"] == 0.8 and data["properties"]["max_active_per_team"] == 3 and data["properties"]["energy_max"] == 100.0 and data["properties"]["energy_drain"] == 1.0 and data["properties"]["technique_energy_cost"] == 0.0 and not data["properties"].has("exclusive_group")
+
+func _migration_save_roundtrip() -> bool:
+    var legacy: Dictionary = _legacy_karma(fixture())
+    var c: IEGTechniqueCatalog = fixture()
+    if c.save_overrides([legacy]) != OK:
+        return false
+    var document: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(_path))
+    var serialized: Dictionary = document["entries"][0]
+    var loaded: IEGTechniqueCatalog = fixture()
+    return document["schema_version"] == 2 and serialized["id"] == "tempest_karma" and serialized["category"] == "KARMA" and not serialized["properties"].has("exclusive_group") and loaded.last_errors.is_empty() and loaded.last_notices.is_empty() and loaded.get_definition("tempest_karma")["name"] == "Karma : Vigie des vents" and legacy["id"] == "tempest_echo" and legacy["properties"].has("exclusive_group")
+
+func _legacy_alias_collision() -> bool:
+    var c: IEGTechniqueCatalog = fixture()
+    _write(JSON.stringify({"schema_version": 1, "entries": [_legacy_karma(c), c.get_definition("tempest_karma")]}))
+    return c.load_overrides() == ERR_INVALID_DATA and not c.last_errors.is_empty() and c.all_definitions().size() == 12
+
+func _legacy_cannot_bypass_cap() -> bool:
+    var legacy: Dictionary = _legacy_karma(fixture())
+    legacy["properties"]["max_active_per_team"] = 4
+    _write(JSON.stringify({"schema_version": 1, "entries": [legacy]}))
+    var c: IEGTechniqueCatalog = fixture()
+    return not c.last_errors.is_empty() and c.get_definition("tempest_karma")["properties"]["max_active_per_team"] == 3

@@ -35,6 +35,7 @@ func _run() -> void:
         red += 1 if state.team_id == 1 else 0
         keepers += 1 if state.is_goalkeeper else 0
     _check(session.players.size() == 22 and blue == 11 and red == 11 and keepers == 2, "22 joueurs, deux équipes complètes et deux gardiens")
+    _check(session.half_duration == 300.0 and hud._clock.text.contains("05:00"), "Match de deux mi-temps de cinq minutes")
     _check(ground.players_root.get_child_count() == 22, "Chaque joueur possède sa vue Godot")
     _check(is_equal_approx(absf(session.attacking_goal(0).y), 45.0), "Terrain de match long de 90 mètres")
     _check(session.controlled().team_id == 0 and not session.controlled().is_goalkeeper, "Engagement et sélection d'un joueur allié de champ")
@@ -52,6 +53,15 @@ func _run() -> void:
     _check(c.pass_ball and c.lob_pass, "Passe lobée transmise par les vraies entrées")
     Input.action_release("lob_pass")
     _check(InputMap.has_action("special_menu"), "Menu de techniques accessible par une action d'entrée")
+    hud.open_actions("KARMA")
+    _check(ground._paused and hud._mode == "actions_KARMA", "Menu Karma accessible pendant le match")
+    hud._activate_content("KARMA", "tempest_karma")
+    _check(not ground._paused and session.get_player(7).modifiers.has("KARMA"), "Activation du Karma par le vrai menu")
+    hud.open_actions("RESONANCE")
+    hud._activate_content("RESONANCE", "twin_resonance")
+    _refresh(ground)
+    _check(session.get_active_modifiers(7).size() == 2 and hud._modifier_bars["KARMA"].visible and hud._modifier_bars["RESONANCE"].visible and hud._modifier_labels["KARMA"].text.contains("Karma") and hud._modifier_labels["RESONANCE"].text.contains("Resonance"), "Karma et Resonance cumulés avec deux réserves visibles")
+    _check(hud._team_modifier_counts[0].text.contains("Karma 1/3") and hud._team_modifier_counts[0].text.contains("Resonance 1/3") and hud._team_modifier_counts[1].text.contains("Karma 0/3") and hud._team_modifier_counts[1].text.contains("Resonance 0/3"), "Compteurs Karma et Resonance séparés pour les deux équipes")
     var clock: float = session.elapsed_half
     hud.pause_requested.emit()
     ground._physics_process(Rules.TICK)

@@ -4,11 +4,13 @@ extends RefCounted
 ## Les modifications locales sont sérialisées dans user://, jamais dans les assets.
 
 const STORAGE_PATH: String = "user://match_content.json"
-const SCHEMA_VERSION: int = 1
-const CATEGORIES: PackedStringArray = ["TIR", "ATT", "DEF", "GAR", "TAC", "ECHO", "RESONANCE"]
+const SCHEMA_VERSION: int = 2
+const MAX_ACTIVE_PER_TEAM: int = 3
+const CATEGORIES: PackedStringArray = ["TIR", "ATT", "DEF", "GAR", "TAC", "KARMA", "RESONANCE"]
 const REQUIRED_FIELDS: PackedStringArray = ["id", "name", "category", "power", "cost", "duration", "range_bonus", "effect", "color", "description", "properties"]
 
 var last_errors: PackedStringArray = []
+var last_notices: PackedStringArray = []
 var _overrides: Dictionary = {}
 var _storage_path: String = STORAGE_PATH
 
@@ -17,6 +19,8 @@ func _init(storage_path: String = STORAGE_PATH) -> void:
     load_overrides()
 
 func get_definition(id: String) -> Dictionary:
+    if id == "tempest_echo":
+        id = "tempest_karma"
     if _overrides.has(id):
         return _overrides[id].duplicate(true)
     for definition: Dictionary in _defaults():
@@ -56,7 +60,7 @@ func validate_definition(data: Dictionary) -> PackedStringArray:
     if not data["name"] is String or String(data["name"]).strip_edges().is_empty() or String(data["name"]).length() > 80:
         errors.append("Le nom doit contenir entre 1 et 80 caractères.")
     if not data["category"] is String or not CATEGORIES.has(String(data["category"])):
-        errors.append("Catégorie inconnue. Utiliser TIR, ATT, DEF, GAR, TAC, ECHO ou RESONANCE.")
+        errors.append("Catégorie inconnue. Utiliser TIR, ATT, DEF, GAR, TAC, KARMA ou RESONANCE.")
     _validate_number(data, "power", 0.0, 500.0, errors)
     _validate_number(data, "cost", 0.0, 100.0, errors)
     _validate_number(data, "duration", 0.1, 600.0, errors)
@@ -89,28 +93,34 @@ func validate_definition(data: Dictionary) -> PackedStringArray:
                 errors.append("width_factor doit être compris entre 0.5 et 1.6.")
             if _is_finite_number(properties.get("pressure")) and (float(properties["pressure"]) < 0.0 or float(properties["pressure"]) > 1.0):
                 errors.append("pressure doit être compris entre 0 et 1.")
-        if str(data["category"]) in ["ECHO", "RESONANCE"]:
-            if str(properties.get("exclusive_group", "")) != "augmentation":
-                errors.append("Écho et Résonance doivent partager exclusive_group : augmentation.")
-        if str(data["category"]) == "ECHO":
-            if not _is_finite_number(properties.get("energy_max")) or float(properties.get("energy_max", 0.0)) <= 0.0:
-                errors.append("Un Écho doit avoir une réserve energy_max positive.")
-            if not _is_finite_number(properties.get("energy_drain")) or float(properties.get("energy_drain", 0.0)) <= 0.0:
-                errors.append("Un Écho doit avoir une consommation energy_drain positive.")
+        if str(data["category"]) in ["KARMA", "RESONANCE"]:
+            var category_name: String = "Karma" if str(data["category"]) == "KARMA" else "Resonance"
+            if not _is_finite_number(properties.get("max_active_per_team")) or float(properties.get("max_active_per_team", 0.0)) != MAX_ACTIVE_PER_TEAM:
+                errors.append("%s impose max_active_per_team : 3. Cette limite ne peut pas être modifiée." % category_name)
+            if not _is_finite_number(properties.get("energy_max")) or float(properties.get("energy_max", 0.0)) <= 0.0 or float(properties.get("energy_max", 0.0)) > 1000.0:
+                errors.append("%s doit avoir une réserve energy_max strictement positive, de 1 000 maximum." % category_name)
+            if not _is_finite_number(properties.get("energy_drain")) or float(properties.get("energy_drain", 0.0)) <= 0.0 or float(properties.get("energy_drain", 0.0)) > 1000.0:
+                errors.append("%s doit avoir une consommation energy_drain strictement positive, de 1 000 maximum." % category_name)
+            if not _is_finite_number(properties.get("technique_energy_cost")) or float(properties.get("technique_energy_cost", -1.0)) < 0.0:
+                errors.append("%s doit définir un coût technique_energy_cost positif ou nul." % category_name)
+            elif _is_finite_number(properties.get("energy_max")) and float(properties["technique_energy_cost"]) > float(properties["energy_max"]):
+                errors.append("technique_energy_cost ne peut pas dépasser la réserve propre energy_max.")
         if str(data["category"]) == "RESONANCE":
             if not properties.has("profile_a") or not properties.has("profile_b"):
-                errors.append("Une Résonance doit préciser profile_a et profile_b.")
+                errors.append("Une Resonance doit préciser profile_a et profile_b.")
             elif properties["profile_a"] == properties["profile_b"]:
-                errors.append("Une Résonance doit réunir deux profils distincts.")
+                errors.append("Une Resonance doit réunir deux profils distincts.")
             if not _is_finite_number(properties.get("blend")) or float(properties.get("blend", -1.0)) < 0.0 or float(properties.get("blend", -1.0)) > 1.0:
                 errors.append("Le mélange blend doit être compris entre 0 et 1.")
     return errors
 
 func save_overrides(entries: Array[Dictionary]) -> Error:
-    var checked: Dictionary = _checked_entries(entries)
+    last_notices.clear()
+    var canonical: Array = _migrate_entries(entries, false)
+    var checked: Dictionary = _checked_entries(canonical)
     if not last_errors.is_empty():
         return ERR_INVALID_DATA
-    var document: String = JSON.stringify({"schema_version": SCHEMA_VERSION, "entries": entries}, "  ")
+    var document: String = JSON.stringify({"schema_version": SCHEMA_VERSION, "entries": canonical}, "  ")
     if document.to_utf8_buffer().size() > 524288:
         last_errors.append("La sauvegarde dépasserait 512 Kio ; réduisez les propriétés ou le nombre de contenus.")
         return ERR_INVALID_DATA
@@ -137,6 +147,7 @@ func save_overrides(entries: Array[Dictionary]) -> Error:
 
 func load_overrides() -> Error:
     last_errors.clear()
+    last_notices.clear()
     if not FileAccess.file_exists(_storage_path):
         _overrides.clear()
         return OK
@@ -158,17 +169,22 @@ func load_overrides() -> Error:
         last_errors.append("Le fichier doit contenir un objet avec schema_version et entries.")
         return ERR_INVALID_DATA
     var document: Dictionary = json.data
-    if document.get("schema_version", -1) != SCHEMA_VERSION or not document.get("entries") is Array:
+    var version: Variant = document.get("schema_version", -1)
+    if not _is_finite_number(version) or (float(version) != 1.0 and float(version) != float(SCHEMA_VERSION)) or not document.get("entries") is Array:
         last_errors.append("Version de contenu inconnue ou tableau entries absent.")
         return ERR_INVALID_DATA
-    var checked: Dictionary = _checked_entries(document["entries"])
+    var legacy: bool = document["schema_version"] == 1
+    var checked: Dictionary = _checked_entries(_migrate_entries(document["entries"], legacy))
     if not last_errors.is_empty():
         return ERR_INVALID_DATA
     _overrides = checked
+    if legacy:
+        last_notices.append("Fichier version 1 chargé sans écrasement. La prochaine sauvegarde utilisera le format version 2.")
     return OK
 
 func reset_overrides() -> Error:
     last_errors.clear()
+    last_notices.clear()
     if FileAccess.file_exists(_storage_path):
         var result: Error = DirAccess.remove_absolute(ProjectSettings.globalize_path(_storage_path))
         if result != OK:
@@ -176,6 +192,46 @@ func reset_overrides() -> Error:
             return result
     _overrides.clear()
     return OK
+
+func _migrate_entries(entries: Array, legacy_schema: bool) -> Array:
+    var result: Array = []
+    for raw: Variant in entries:
+        if not raw is Dictionary:
+            result.append(raw)
+            continue
+        var data: Dictionary = raw.duplicate(true)
+        var legacy: bool = str(data.get("category", "")) == "ECHO" or str(data.get("id", "")) == "tempest_echo" or str(data.get("effect", "")) == "echo"
+        if str(data.get("category", "")) == "ECHO":
+            data["category"] = "KARMA"
+        if str(data.get("id", "")) == "tempest_echo":
+            data["id"] = "tempest_karma"
+        if str(data.get("effect", "")) == "echo":
+            data["effect"] = "karma"
+        if str(data.get("name", "")) == "Écho : Vigie des vents":
+            data["name"] = "Karma : Vigie des vents"
+        if str(data.get("name", "")) == "Résonance : Double horizon":
+            data["name"] = "Resonance : Double horizon"
+        if str(data.get("description", "")) == "Une silhouette de vent accompagne le joueur. Sa réserve d'énergie propre se vide avec le temps et chaque technique. Incompatible avec une Résonance.":
+            data["description"] = "Une silhouette de vent accompagne le joueur. Sa réserve d'énergie propre se vide avec le temps et chaque technique. Cumulable avec Resonance ; trois Karma maximum par équipe."
+        if str(data.get("description", "")) == "Deux profils mettent leurs qualités en commun pour une fusion temporaire pondérée. Une seule augmentation peut être active.":
+            data["description"] = "Deux profils mettent leurs qualités en commun pour une fusion temporaire pondérée. Cumulable avec Karma ; trois Resonance maximum par équipe."
+        var category: String = str(data.get("category", ""))
+        if data.get("properties") is Dictionary and category in ["KARMA", "RESONANCE"]:
+            var properties: Dictionary = data["properties"]
+            var had_exclusive_group: bool = properties.has("exclusive_group")
+            properties.erase("exclusive_group")
+            if legacy or legacy_schema or had_exclusive_group:
+                if not properties.has("max_active_per_team"):
+                    properties["max_active_per_team"] = MAX_ACTIVE_PER_TEAM
+                if not properties.has("energy_max"):
+                    properties["energy_max"] = 100.0
+                if not properties.has("energy_drain"):
+                    properties["energy_drain"] = 2.2 if category == "KARMA" else 1.0
+                if not properties.has("technique_energy_cost"):
+                    properties["technique_energy_cost"] = 18.0 if category == "KARMA" else 0.0
+                last_notices.append("%s : %s et Resonance sont cumulables ; limite fixe de trois actifs de chaque type par équipe. Budgets personnalisés conservés." % [str(data.get("id", "contenu")), "Karma"])
+        result.append(data)
+    return result
 
 func _checked_entries(entries: Array) -> Dictionary:
     last_errors.clear()
@@ -267,10 +323,10 @@ func _defaults() -> Array[Dictionary]:
         _definition("compact_press", "Étau collectif", "TAC", 0.0, 15.0, 45.0, 0.0, "press", "#ff937c",
             "Le bloc se resserre et avance sur le porteur, avec un seul poursuivant pour conserver les couvertures.",
             {"width_factor": 0.72, "pressure": 0.85}),
-        _definition("tempest_echo", "Écho : Vigie des vents", "ECHO", 14.0, 0.0, 45.0, 0.0, "echo", "#c2b0ff",
-            "Une silhouette de vent accompagne le joueur. Sa réserve d'énergie propre se vide avec le temps et chaque technique. Incompatible avec une Résonance.",
-            {"exclusive_group": "augmentation", "energy_max": 100.0, "energy_drain": 2.2, "technique_energy_cost": 18.0}),
-        _definition("twin_resonance", "Résonance : Double horizon", "RESONANCE", 12.0, 20.0, 60.0, 0.0, "resonance", "#ff9fe3",
-            "Deux profils mettent leurs qualités en commun pour une fusion temporaire pondérée. Une seule augmentation peut être active.",
-            {"exclusive_group": "augmentation", "profile_a": 7, "profile_b": 10, "blend": 0.5}),
+        _definition("tempest_karma", "Karma : Vigie des vents", "KARMA", 14.0, 0.0, 45.0, 0.0, "karma", "#c2b0ff",
+            "Une silhouette de vent accompagne le joueur. Sa réserve d'énergie propre se vide avec le temps et chaque technique. Cumulable avec Resonance ; trois Karma maximum par équipe.",
+            {"max_active_per_team": MAX_ACTIVE_PER_TEAM, "energy_max": 100.0, "energy_drain": 2.2, "technique_energy_cost": 18.0}),
+        _definition("twin_resonance", "Resonance : Double horizon", "RESONANCE", 12.0, 20.0, 60.0, 0.0, "resonance", "#ff9fe3",
+            "Deux profils mettent leurs qualités en commun pour une fusion temporaire pondérée. Cumulable avec Karma ; trois Resonance maximum par équipe.",
+            {"max_active_per_team": MAX_ACTIVE_PER_TEAM, "energy_max": 100.0, "energy_drain": 1.0, "technique_energy_cost": 0.0, "profile_a": 7, "profile_b": 10, "blend": 0.5}),
     ]

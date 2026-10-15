@@ -27,6 +27,8 @@ func _ready() -> void:
         _show_entry(0)
     if not catalog.last_errors.is_empty():
         _set_status("Le fichier local n'a pas été chargé. Les contenus intégrés restent disponibles.\n" + "\n".join(catalog.last_errors), true)
+    elif not catalog.last_notices.is_empty():
+        _set_status("Contenus migrés en mémoire ; paramètres personnalisés conservés. Sauvegardez pour actualiser le fichier local.\n" + "\n".join(catalog.last_notices))
     else:
         _set_status("Contenus intégrés chargés. Modifiez une fiche, puis sauvegardez pour les prochains matchs.")
 
@@ -44,7 +46,7 @@ func _build_ui() -> void:
     layout.add_theme_constant_override("separation", 10)
     margin.add_child(layout)
     var title: Label = Label.new()
-    title.text = "ATELIER DU MATCH — Techniques, tactiques et augmentations"
+    title.text = "ATELIER DU MATCH — Techniques, tactiques, Karma et Resonance"
     title.add_theme_font_size_override("font_size", 24)
     layout.add_child(title)
     var help: Label = Label.new()
@@ -114,7 +116,7 @@ func _build_ui() -> void:
     _add_number_field(grid, "Bonus portée (m)", "range_bonus", -25.0, 100.0)
     _add_text_field(grid, "Couleur HTML", "color")
     var semantics: Label = Label.new()
-    semantics.text = "Durée = cinématique pour une technique ; effet en jeu pour TAC / Écho / Résonance."
+    semantics.text = "Durée = cinématique pour une technique ; effet en jeu pour TAC / Karma / Resonance. Karma et Resonance se cumulent ; maximum 3 de chaque par équipe."
     semantics.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     editor.add_child(semantics)
     _add_label(editor, "Description")
@@ -125,7 +127,11 @@ func _build_ui() -> void:
     description.text_changed.connect(_mark_dirty)
     _fields["description"] = description
     editor.add_child(description)
-    _add_label(editor, "Propriétés JSON — TAC : width_factor / pressure ; Écho : energy_max / energy_drain ; Résonance : profile_a / profile_b / blend")
+    var properties_help: Label = Label.new()
+    properties_help.text = "Propriétés JSON — TAC : width_factor / pressure. Karma et Resonance : max_active_per_team = 3 (fixe), energy_max / energy_drain / technique_energy_cost. Resonance : profile_a / profile_b / blend."
+    properties_help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    properties_help.add_theme_font_size_override("font_size", 14)
+    editor.add_child(properties_help)
     var properties: TextEdit = TextEdit.new()
     properties.name = "Properties"
     properties.custom_minimum_size.y = 160
@@ -296,7 +302,10 @@ func _reload() -> void:
         if String(_entries[index]["id"]) == selected_id:
             target = index
     _show_entry(target)
-    _set_status("Contenus rechargés depuis la sauvegarde locale.")
+    if not catalog.last_notices.is_empty():
+        _set_status("Rechargé et migré sans écraser le fichier. " + " ".join(catalog.last_notices))
+    else:
+        _set_status("Contenus rechargés depuis la sauvegarde locale.")
 
 func _request_restore() -> void:
     _restore_dialog.popup_centered()
