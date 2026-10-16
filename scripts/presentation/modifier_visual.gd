@@ -1,8 +1,12 @@
 class_name IEGModifierVisual
 extends Node3D
-## Géométrie originale, Godot standard. Aucun résultat ni budget n'est calculé ici.
+## Modèles originaux GLB, palettes et articulation en Godot standard.
+## Aucun résultat ni budget n'est calculé ici.
 ## configure(definition), puis set_presentation(secondes,intensité,issue).
 ## set_signature_progress(charge,après_scores,issue) anime une signature déjà résolue.
+
+const ASTREION_MODEL: PackedScene = preload("res://assets/karma/astreion.glb")
+const THALASSA_MODEL: PackedScene = preload("res://assets/karma/thalassa.glb")
 
 var style: String = ""
 var definition: Dictionary = {}
@@ -21,6 +25,7 @@ var _color: Color
 var _time: float = 0.0
 var _signature: bool = false
 var _height_scale: float = 1.0
+var _palette: Dictionary = {}
 
 func configure(source: Dictionary) -> void:
     definition = source.duplicate(true)
@@ -36,6 +41,7 @@ func configure(source: Dictionary) -> void:
     _arches.clear()
     _core = null
     _hammer = null
+    _palette.clear()
     var props: Dictionary = definition.get("properties", {})
     var appearance: Dictionary = props.get("appearance", {})
     style = str(appearance.get("style", props.get("preview", definition.get("id", ""))))
@@ -80,6 +86,7 @@ func set_presentation(time: float, intensity: float = 1.0, _outcome: String = ""
     _body.scale = Vector3.ONE * maxf(0.001, intensity) * _height_scale
     for index: int in _rings.size():
         _rings[index].rotation = Vector3(0.25 + index * 0.5, time * (0.5 + index * 0.16), index * 0.7)
+        _rings[index].scale = Vector3.ONE
     for index: int in _mist.size():
         var phase: float = time * 0.7 + index * TAU / maxf(1, _mist.size())
         _mist[index].position = Vector3(cos(phase) * (0.3 + index % 3 * 0.12),
@@ -92,7 +99,7 @@ func set_presentation(time: float, intensity: float = 1.0, _outcome: String = ""
     for index: int in _wings.size():
         _wings[index].rotation.z = (-1.0 if index == 0 else 1.0) * (0.07 + sin(time * 1.6) * 0.035)
     if _core != null:
-        _core.rotation = Vector3(time * 0.55, time * 0.7, time * 0.25)
+        _core.rotation = Vector3(sin(time * 0.8) * 0.12, sin(time * 0.55) * 0.16, time * 0.28)
         _core.scale = Vector3.ONE * (1 + sin(time * 3.4) * 0.08)
     for pillar: MeshInstance3D in _pillars:
         pillar.visible = false
@@ -138,103 +145,195 @@ func set_signature_progress(charge: float, after: float, outcome: String = "") -
         _body.rotation.x = -failure * 0.18
 
 func _build_astreion() -> void:
-    var armor: StandardMaterial3D = _material(_primary, false)
-    var copper: StandardMaterial3D = _material(_color.darkened(0.16), false)
-    var light: StandardMaterial3D = _material(_color, true)
-    var haze: StandardMaterial3D = _material(_color, true, 0.18)
-    _box(_body, Vector3(0, 1.8, 0), Vector3(0.8, 0.36, 0.48), armor)
-    _box(_body, Vector3(0, 2.55, 0.05), Vector3(1.12, 1.0, 0.5), armor)
-    # Deux pectoraux laissent réellement ouverte la cage centrale de l'étoile.
-    _box(_body, Vector3(-0.36, 2.75, -0.32), Vector3(0.31, 0.8, 0.2), copper)
-    _box(_body, Vector3(0.36, 2.75, -0.32), Vector3(0.31, 0.8, 0.2), copper)
-    _core = _sphere(_body, Vector3(0, 2.67, -0.4), 0.26, light)
+    _create_palette()
+    var model: Node3D = ASTREION_MODEL.instantiate()
+    _take_part(model, "BodyArmor", _body)
+    _take_part(model, "BodyDetails", _body)
+    _core = _take_part(model, "Core", _body) as MeshInstance3D
+    for part_name: String in ["ArmLeft", "ArmRight"]:
+        _arms.append(_take_part(model, part_name, _body))
+    _hammer = _take_part(model, "Hammer", _arms[1])
     for index: int in 3:
-        var ring: MeshInstance3D = _ring(_body, Vector3(0, 2.67, -0.42), 0.36 + index * 0.055, light)
-        ring.rotation.x = PI * 0.5
-    _sphere(_body, Vector3(0, 3.43, 0), 0.37, armor).scale = Vector3(0.82, 1.15, 0.85)
-    _ring(_body, Vector3(0, 3.45, -0.27), 0.3, copper).rotation.x = PI * 0.5
-    _box(_body, Vector3(0, 3.45, -0.32), Vector3(0.32, 0.045, 0.035), light)
-    _cone(_body, Vector3(0, 3.88, 0), 0.26, 0.42, copper)
-    for side: int in [-1, 1]:
-        _sphere(_body, Vector3(side * 0.85, 2.95, 0), 0.39, copper).scale = Vector3(1.2, 0.8, 1.0)
-        var arm: Node3D = Node3D.new()
-        arm.position = Vector3(side * 0.82, 2.86, 0)
-        _body.add_child(arm)
-        _arms.append(arm)
-        _cylinder(arm, Vector3(0, -0.45, 0), 0.2, 0.85, armor)
-        _box(arm, Vector3(0, -0.97, 0), Vector3(0.4, 0.5, 0.42), copper)
-        _sphere(arm, Vector3(0, -1.31, -0.04), 0.23, armor)
-    for index: int in 3:
-        var orbit: MeshInstance3D = _ring(_body, Vector3(0, 2.7, 0.3), 1.22 + index * 0.2, light)
-        _rings.append(orbit)
-    for index: int in 12:
-        _mist.append(_sphere(_body, Vector3.ZERO, 0.2 + (index % 3) * 0.055, haze))
-    _hammer = Node3D.new()
-    _hammer.position = Vector3(0, -1.24, 0)
-    _arms[1].add_child(_hammer)
-    _cylinder(_hammer, Vector3(0, -0.5, 0), 0.055, 1.6, copper)
-    _box(_hammer, Vector3(0, -1.25, 0), Vector3(1.0, 0.56, 0.56), armor)
-    _box(_hammer, Vector3(0, -1.25, -0.31), Vector3(0.75, 0.34, 0.055), light)
-    for side: int in [-1, 1]:
-        _box(_hammer, Vector3(side * 0.48, -1.25, 0), Vector3(0.15, 0.62, 0.62), copper)
+        _rings.append(_take_part(model, "Orbit%d" % index, _body) as MeshInstance3D)
+    # Petits éclats effilés, jamais des sphères de brouillard masquant le modèle.
+    for index: int in 9:
+        _mist.append(_shard(_body, 0.035 + (index % 3) * 0.012, _palette.Light))
+    model.free()
 
 func _build_thalassa() -> void:
-    var armor: StandardMaterial3D = _material(_primary, false)
-    var glass: StandardMaterial3D = _material(_color, false, 0.62)
-    var light: StandardMaterial3D = _material(_color.lightened(0.18), true)
-    _sphere(_body, Vector3(0, 2.25, 0), 0.64, glass).scale = Vector3(0.8, 1.2, 0.65)
-    _box(_body, Vector3(0, 2.65, -0.25), Vector3(0.65, 0.66, 0.2), armor)
-    _sphere(_body, Vector3(0, 3.24, 0), 0.3, glass)
-    _box(_body, Vector3(0, 3.27, -0.28), Vector3(0.34, 0.055, 0.04), light)
-    _cone(_body, Vector3(0, 3.64, 0.08), 0.24, 0.44, armor)
-    for side: int in [-1, 1]:
-        var arm: Node3D = Node3D.new()
-        arm.position = Vector3(side * 0.53, 2.7, -0.12)
-        _body.add_child(arm)
-        _arms.append(arm)
-        _cylinder(arm, Vector3(side * 0.23, -0.4, 0), 0.15, 0.85, armor).rotation.z = side * 0.45
-        _sphere(arm, Vector3(side * 0.42, -0.94, -0.08), 0.27, glass).scale = Vector3(0.9, 1.4, 0.6)
-        var shield: MeshInstance3D = _ring(arm, Vector3(side * 0.43, -0.95, -0.24), 0.39, light)
-        shield.rotation.x = PI * 0.5
-        var wing: MeshInstance3D = _wing(_body, side, glass)
-        _wings.append(wing)
-        var turbine: Node3D = Node3D.new()
-        turbine.position = Vector3(side * 0.86, 2.9, 0.42)
-        _body.add_child(turbine)
-        _turbines.append(turbine)
-        _ring(turbine, Vector3.ZERO, 0.4, armor).rotation.x = PI * 0.5
-        for blade: int in 5:
-            var angle: float = blade * TAU / 5
-            var vane: MeshInstance3D = _box(turbine, Vector3(cos(angle), sin(angle), 0) * 0.2, Vector3(0.3, 0.09, 0.04), light)
-            vane.rotation.z = angle + 0.4
+    _create_palette()
+    var model: Node3D = THALASSA_MODEL.instantiate()
+    _take_part(model, "BodyArmor", _body)
+    _take_part(model, "BodyDetails", _body)
+    _core = _take_part(model, "Core", _body) as MeshInstance3D
+    for part_name: String in ["ArmLeft", "ArmRight"]:
+        _arms.append(_take_part(model, part_name, _body))
+    for part_name: String in ["WingLeft", "WingRight"]:
+        _wings.append(_take_part(model, part_name, _body) as MeshInstance3D)
+    for part_name: String in ["TurbineLeft", "TurbineRight"]:
+        _turbines.append(_take_part(model, part_name, _body))
+    model.free()
     for index: int in 9:
-        _mist.append(_sphere(_body, Vector3.ZERO, 0.17, _material(_color, true, 0.2)))
+        _mist.append(_shard(_body, 0.026 + (index % 3) * 0.01, _palette.Light))
+    # Éléments de signature indépendants des panneaux sculptés du personnage.
+    var water: StandardMaterial3D = _material(_color.darkened(0.12), true, 0.42)
     for index: int in 6:
-        _pillars.append(_cylinder(_body, Vector3.ZERO, 0.12, 2.9, glass))
+        _pillars.append(_fluted_pillar(_body, water))
     for index: int in 3:
-        _arches.append(_ring(_body, Vector3.ZERO, 1.45 + index * 0.08, light))
+        _arches.append(_ring(_body, Vector3.ZERO, 1.45 + index * 0.08, _palette.Light))
+
+func _create_palette() -> void:
+    var armor: StandardMaterial3D = _material(_primary, false)
+    armor.metallic = 0.20
+    armor.roughness = 0.43
+    armor.diffuse_mode = BaseMaterial3D.DIFFUSE_TOON
+    armor.rim_enabled = true
+    armor.rim = 0.22
+    armor.rim_tint = 0.5
+    var trim: StandardMaterial3D = _material(_color.darkened(0.24), false)
+    trim.metallic = 0.40
+    trim.roughness = 0.35
+    var light: StandardMaterial3D = _material(_color, true)
+    light.emission_energy_multiplier = 0.55
+    var dark: StandardMaterial3D = _material(_primary.darkened(0.6), false)
+    dark.metallic = 0.2
+    dark.roughness = 0.5
+    # Opaque coloured sea glass: silhouettes stay readable in Compatibility and
+    # in the editor; the magical water pillars carry the actual transparency.
+    var glass: StandardMaterial3D = _material(_color.darkened(0.48), false)
+    glass.metallic = 0.15
+    glass.roughness = 0.24
+    glass.rim_enabled = true
+    glass.rim = 0.32
+    glass.rim_tint = 0.7
+    if style == "astreion":
+        glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+        glass.albedo_color = Color(_color, 0.24)
+        glass.metallic = 0.0
+        glass.emission_enabled = true
+        glass.emission = _color
+        glass.emission_energy_multiplier = 0.55
+    _palette = {"Primary": armor, "Trim": trim, "Light": light, "Dark": dark, "Glass": glass}
+
+func _take_part(model: Node3D, part_name: String, parent: Node3D) -> Node3D:
+    var part: Node3D = model.find_child(part_name, true, false) as Node3D
+    assert(part != null, "Pièce du modèle Karma absente : " + part_name)
+    _clear_part_owners(part)
+    part.get_parent().remove_child(part)
+    parent.add_child(part)
+    _apply_model_palette(part)
+    return part
+
+func _clear_part_owners(node: Node) -> void:
+    node.owner = null
+    for child: Node in node.get_children():
+        _clear_part_owners(child)
+
+func _apply_model_palette(node: Node) -> void:
+    if node is MeshInstance3D:
+        var instance: MeshInstance3D = node as MeshInstance3D
+        for surface: int in instance.mesh.get_surface_count():
+            var original: Material = instance.mesh.surface_get_material(surface)
+            var material_name: String = original.resource_name if original != null else "Primary"
+            for key: String in _palette:
+                if material_name.begins_with(key):
+                    if instance.mesh.get_surface_count() == 1:
+                        instance.material_override = _palette[key]
+                    else:
+                        instance.set_surface_override_material(surface, _palette[key])
+                    break
+        instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+    for child: Node in node.get_children():
+        _apply_model_palette(child)
 
 func _build_resonance() -> void:
     var material: StandardMaterial3D = _material(_color, true)
-    var primary_material: StandardMaterial3D = _material(_primary, true)
+    material.emission_energy_multiplier = 0.6
+    var pale: StandardMaterial3D = _material(_color.lightened(0.52), true)
+    pale.emission_energy_multiplier = 0.3
     if style == "sovereign_orbit":
         for side: int in [-1, 1]:
-            var ring: MeshInstance3D = _ring(_body, Vector3(side * 0.16, 0.22, 0), 0.22, material)
-            _rings.append(ring)
-        # Mèche et constellation : éléments amovibles, aucun asset partagé modifié.
-        var lock: MeshInstance3D = _cone(_body, Vector3(0.1, 1.79, -0.16), 0.045, 0.18, primary_material)
-        lock.rotation = Vector3(PI, 0, -0.35)
-        for index: int in 5:
-            _sphere(_body, Vector3(-0.19 + index * 0.08, 1.38 - sin(index) * 0.06, -0.23), 0.025, material)
+            # Des rubans à section aiguisée épousent les chevilles.
+            var ribbon: MeshInstance3D = _ribbon(_body, Vector3(side * 0.16, 0.20, 0), 0.19, 0.025, material)
+            _rings.append(ribbon)
+        # Mèche effilée et coutures de constellation, aux proportions du visage.
+        _hair_lock(_body, Vector3(0.07, 1.79, -0.105), pale, 1)
+        var points: Array[Vector3] = [Vector3(-0.13, 1.40, -0.17), Vector3(-0.06, 1.37, -0.205),
+            Vector3(0.01, 1.40, -0.215), Vector3(0.08, 1.35, -0.205), Vector3(0.15, 1.38, -0.17)]
+        for index: int in points.size() - 1:
+            _line(_body, points[index], points[index + 1], 0.004, material)
+        for point: Vector3 in points:
+            var mark: MeshInstance3D = _shard(_body, 0.012, pale)
+            mark.position = point
+            mark.scale = Vector3(0.7, 1, 0.2)
     else:
         for side: int in [-1, 1]:
-            var ring: MeshInstance3D = _ring(_body, Vector3(side * 0.48, 0.95, 0), 0.19, material)
-            _rings.append(ring)
-        _cone(_body, Vector3(-0.11, 1.79, -0.17), 0.045, 0.17, primary_material).rotation = Vector3(PI, 0, 0.35)
-        for side: int in [-1, 1]:
-            _box(_body, Vector3(side * 0.34, 1.28, -0.12), Vector3(0.08, 0.34, 0.04), primary_material).rotation.z = side * 0.3
+            var ribbon: MeshInstance3D = _ribbon(_body, Vector3(side * 0.43, 0.96, 0), 0.12, 0.019, material)
+            _rings.append(ribbon)
+            for index: int in 2:
+                var a: Vector3 = Vector3(side * (0.30 + index * 0.027), 1.41, -0.10)
+                var b: Vector3 = Vector3(side * (0.37 + index * 0.027), 1.21, -0.11)
+                _line(_body, a, b, 0.007, material)
+        _hair_lock(_body, Vector3(-0.06, 1.79, -0.105), pale, -1)
+    # De minces facettes remplacent les anciennes billes devant les yeux.
     for side: int in [-1, 1]:
-        _sphere(_body, Vector3(side * 0.075, 1.67, -0.19), 0.022, primary_material)
+        _line(_body, Vector3(side * 0.045, 1.67, -0.165), Vector3(side * 0.088, 1.678, -0.153), 0.004, pale)
+
+func _hair_lock(parent: Node3D, point: Vector3, material: Material, side: int) -> void:
+    var vertices: Array[Vector3] = [Vector3(-0.035, 0.02, 0.015), Vector3(0.025, 0.035, 0.02),
+        Vector3(side * 0.025, -0.17, -0.015), Vector3(0, -0.025, -0.035)]
+    _facets(parent, vertices, [0, 1, 3, 1, 2, 3, 2, 0, 3, 0, 2, 1], point, material)
+
+func _shard(parent: Node3D, size: float, material: Material) -> MeshInstance3D:
+    var vertices: Array[Vector3] = [Vector3(0, size * 2.5, 0), Vector3(-size, 0, 0),
+        Vector3(0, 0, -size * 0.6), Vector3(size, 0, 0), Vector3(0, 0, size * 0.6), Vector3(0, -size * 2, 0)]
+    return _facets(parent, vertices, [0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 1,
+        5, 2, 1, 5, 3, 2, 5, 4, 3, 5, 1, 4], Vector3.ZERO, material)
+
+func _facets(parent: Node3D, vertices: Array[Vector3], indices: Array[int], point: Vector3, material: Material) -> MeshInstance3D:
+    var mesh: ImmediateMesh = ImmediateMesh.new()
+    mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+    for triangle: int in indices.size() / 3:
+        var a: Vector3 = vertices[indices[triangle * 3]]
+        var b: Vector3 = vertices[indices[triangle * 3 + 1]]
+        var c: Vector3 = vertices[indices[triangle * 3 + 2]]
+        mesh.surface_set_normal((b - a).cross(c - a).normalized())
+        mesh.surface_add_vertex(a)
+        mesh.surface_add_vertex(b)
+        mesh.surface_add_vertex(c)
+    mesh.surface_end()
+    return _mesh(parent, mesh, point, material)
+
+func _ribbon(parent: Node3D, point: Vector3, radius: float, width: float, material: Material) -> MeshInstance3D:
+    var mesh: ImmediateMesh = ImmediateMesh.new()
+    mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+    for segment: int in 48:
+        var angle_a: float = segment * TAU / 48
+        var angle_b: float = (segment + 1) * TAU / 48
+        var taper_a: float = width * (0.4 + 0.6 * sin(angle_a * 0.5))
+        var taper_b: float = width * (0.4 + 0.6 * sin(angle_b * 0.5))
+        var a: Vector3 = Vector3(cos(angle_a) * (radius - taper_a), sin(angle_a * 2) * 0.014, sin(angle_a) * (radius - taper_a))
+        var b: Vector3 = Vector3(cos(angle_a) * (radius + taper_a), 0.01 + sin(angle_a * 2) * 0.014, sin(angle_a) * (radius + taper_a))
+        var c: Vector3 = Vector3(cos(angle_b) * (radius - taper_b), sin(angle_b * 2) * 0.014, sin(angle_b) * (radius - taper_b))
+        var d: Vector3 = Vector3(cos(angle_b) * (radius + taper_b), 0.01 + sin(angle_b * 2) * 0.014, sin(angle_b) * (radius + taper_b))
+        mesh.surface_set_normal(Vector3.UP)
+        for vertex: Vector3 in [a, b, c, b, d, c]:
+            mesh.surface_add_vertex(vertex)
+    mesh.surface_end()
+    return _mesh(parent, mesh, point, material)
+
+func _line(parent: Node3D, a: Vector3, b: Vector3, radius: float, material: Material) -> void:
+    var instance: MeshInstance3D = _cylinder(parent, (a + b) * 0.5, radius, a.distance_to(b), material)
+    var direction: Vector3 = (b - a).normalized()
+    instance.quaternion = Quaternion(Vector3.UP, direction)
+
+func _fluted_pillar(parent: Node3D, material: Material) -> MeshInstance3D:
+    var mesh: CylinderMesh = CylinderMesh.new()
+    mesh.top_radius = 0.075
+    mesh.bottom_radius = 0.16
+    mesh.height = 2.9
+    mesh.radial_segments = 10
+    return _mesh(parent, mesh, Vector3.ZERO, material)
 
 func _build_fallback() -> void:
     # Contenus historiques et nouveaux styles personnalisés restent visibles dans l'atelier.
@@ -243,18 +342,6 @@ func _build_fallback() -> void:
         _rings.append(_ring(_body, Vector3(0, 0.4 + index * 0.45, 0), 0.6 + index * 0.12, material))
     for index: int in 6:
         _mist.append(_sphere(_body, Vector3.ZERO, 0.06, material))
-
-func _wing(parent: Node3D, side: int, material: Material) -> MeshInstance3D:
-    var mesh: ImmediateMesh = ImmediateMesh.new()
-    mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
-    var vertices: Array[Vector3] = [Vector3(side * 0.3, 2.8, 0.15), Vector3(side * 2.0, 2.55, 0.3),
-        Vector3(side * 1.15, 1.75, 0.6), Vector3(side * 0.3, 2.8, 0.15),
-        Vector3(side * 1.15, 1.75, 0.6), Vector3(side * 0.35, 1.25, 0.42)]
-    for vertex: Vector3 in vertices:
-        mesh.surface_set_normal(Vector3.FORWARD)
-        mesh.surface_add_vertex(vertex)
-    mesh.surface_end()
-    return _mesh(parent, mesh, Vector3.ZERO, material)
 
 func _material(color: Color, emissive: bool, opacity: float = 1) -> StandardMaterial3D:
     var material: StandardMaterial3D = StandardMaterial3D.new()

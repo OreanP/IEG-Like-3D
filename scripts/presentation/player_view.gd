@@ -16,6 +16,7 @@ var _animations: AnimationPlayer
 var _clips: Dictionary = {}
 var _current: String = ""
 var _kick_remaining: float = 0.0
+var _kit_number: Label3D
 
 func _ready() -> void:
     if profile == null:
@@ -26,6 +27,7 @@ func configure(source: IEGPlayerProfile) -> void:
     profile = source
     number_label.text = "%02d" % profile.shirt_number
     _configure_tree(visual_model)
+    _configure_kit_number()
     if _animations != null:
         # Ne pas modifier la ressource d'animation partagée entre les joueurs.
         for library_name: StringName in _animations.get_animation_library_list():
@@ -42,6 +44,33 @@ func configure(source: IEGPlayerProfile) -> void:
             push_warning("Le modèle de joueur n'a pas ses quatre animations S0.")
     _play("Idle")
 
+func _configure_kit_number() -> void:
+    # The printed number follows the chest rig, including the cinematic poses.
+    # It is separate from the small floating indicator used during live play.
+    if _kit_number == null:
+        var skeletons: Array[Node] = visual_model.find_children("*", "Skeleton3D", true, false)
+        if skeletons.is_empty():
+            return
+        var skeleton: Skeleton3D = skeletons[0] as Skeleton3D
+        var chest: int = skeleton.find_bone("Chest")
+        if chest < 0:
+            return
+        var attachment: BoneAttachment3D = BoneAttachment3D.new()
+        attachment.name = "KitNumberAttachment"
+        attachment.bone_name = "Chest"
+        skeleton.add_child(attachment)
+        _kit_number = Label3D.new()
+        _kit_number.name = "PrintedNumber"
+        _kit_number.font_size = 96
+        _kit_number.pixel_size = 0.00165
+        _kit_number.outline_size = 0
+        _kit_number.shaded = true
+        _kit_number.double_sided = false
+        _kit_number.modulate = Color("eef4fb")
+        attachment.add_child(_kit_number)
+        _kit_number.transform = skeleton.get_bone_global_rest(chest).affine_inverse() * Transform3D(Basis.IDENTITY, Vector3(0.0, 1.225, 0.112))
+    _kit_number.text = "%02d" % profile.shirt_number
+
 func _configure_tree(node: Node) -> void:
     if node is AnimationPlayer:
         _animations = node
@@ -51,12 +80,20 @@ func _configure_tree(node: Node) -> void:
             if original is StandardMaterial3D:
                 var material: StandardMaterial3D = original.duplicate() as StandardMaterial3D
                 var material_name: String = original.resource_name.to_lower()
-                if material_name.contains("jersey"):
+                if material_name == "jersey_shadow":
+                    material.albedo_color = profile.kit_color.darkened(0.58)
+                elif material_name.contains("jersey"):
                     material.albedo_color = profile.kit_color
                 elif material_name == "skin":
                     material.albedo_color = profile.skin_color
+                elif material_name == "skin_shade":
+                    material.albedo_color = profile.skin_color.darkened(0.28)
                 elif material_name == "hair":
                     material.albedo_color = profile.hair_color
+                elif material_name == "hair_highlight":
+                    material.albedo_color = profile.hair_color.lightened(0.12)
+                elif material_name == "shorts":
+                    material.albedo_color = Color("101c32")
                 node.set_surface_override_material(surface_index, material)
     for child: Node in node.get_children():
         _configure_tree(child)
@@ -68,7 +105,10 @@ func sync_state(state: IEGPlayerState, selected: bool, pass_target: bool, delta:
     rotation.y = lerp_angle(rotation.y, angle, 1.0 - exp(-16.0 * delta))
     selection_ring.visible = selected
     target_ring.visible = pass_target
-    number_label.modulate = Color("ffdd87") if selected else Color.WHITE
+    # Keep twenty-two floating labels from overpowering the match. The active
+    # player and intended receiver retain a stronger, readable indication.
+    number_label.modulate = Color("ffdd87") if selected else (Color("a4f0ef") if pass_target else Color(0.88, 0.94, 1.0, 0.54))
+    number_label.font_size = 32 if selected or pass_target else 22
     visual_model.rotation.z = lerpf(visual_model.rotation.z, 0.0, 1.0 - exp(-10.0 * delta))
     _kick_remaining = maxf(0.0, _kick_remaining - delta)
     if _kick_remaining > 0.0:
