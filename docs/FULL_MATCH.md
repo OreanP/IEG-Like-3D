@@ -2,6 +2,8 @@
 
 Cette scène permet de jouer un match du coup d'envoi au résultat final. Elle reste un prototype : la demande est implémentée avec des règles originales et des animations procédurales sur les modèles existants, pas avec les ressources ni les formules commerciales d'Inazuma Eleven.
 
+La [refonte visuelle du 16 octobre](VISUAL_UPDATE.md) remplace les modèles affichés par de nouveaux assets riggés et des Karma modelés, tout en conservant les originaux et les contrats de simulation. Le stade, la caméra, le HUD, les portraits de duel et l'atelier ont été retravaillés ; les captures et la validation graphique sont documentées dans cette page.
+
 ## Lancer et jouer
 
 Godot **standard 4.7 stable**, GDScript uniquement. Ouvrir `project.godot` et F5 lance désormais `scenes/full_match.tscn`. Le terrain d'entraînement reste disponible par le menu ou en lançant `scenes/training_ground.tscn` avec F6.

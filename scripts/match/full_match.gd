@@ -42,6 +42,8 @@ var _armed_technique: String = ""
 var _editor_layer: CanvasLayer
 var _editor_previous_focus: Control
 var _original_scale_size: Vector2i
+var _editor_previous_disable_3d: bool = false
+var _editor_owns_3d_disable: bool = false
 
 func _ready() -> void:
     process_mode = Node.PROCESS_MODE_ALWAYS
@@ -131,6 +133,8 @@ func _notification(what: int) -> void:
         _set_paused(true)
 
 func _exit_tree() -> void:
+    if _editor_owns_3d_disable:
+        get_viewport().disable_3d = _editor_previous_disable_3d
     var window: Window = get_window()
     if window != null and window.size_changed.is_connected(_fit_interface):
         window.size_changed.disconnect(_fit_interface)
@@ -378,6 +382,11 @@ func _open_editor() -> void:
         return
     controls.set_enabled(false)
     _set_animations_active(false)
+    # L'atelier est opaque et son studio possède son propre SubViewport.
+    # Éviter de rendre le stade entier sous l'interface pendant l'édition.
+    _editor_previous_disable_3d = get_viewport().disable_3d
+    _editor_owns_3d_disable = true
+    get_viewport().disable_3d = true
     _editor_previous_focus = get_viewport().gui_get_focus_owner()
     hud.visible = false
     _editor_layer = CanvasLayer.new()
@@ -392,6 +401,9 @@ func _open_editor() -> void:
     editor.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 func _close_editor() -> void:
+    if _editor_owns_3d_disable:
+        get_viewport().disable_3d = _editor_previous_disable_3d
+        _editor_owns_3d_disable = false
     if is_instance_valid(_editor_layer):
         _editor_layer.queue_free()
     _editor_layer = null

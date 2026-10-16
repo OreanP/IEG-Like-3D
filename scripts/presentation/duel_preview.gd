@@ -79,7 +79,13 @@ func _build_ui() -> void:
     add_child(layer)
     var panel: PanelContainer = PanelContainer.new()
     panel.theme = VisualTheme.make_theme()
-    panel.position = Vector2(24.0, 12.0)
+    # Laisser libre le côté où apparaissent les grands Karma.
+    panel.anchor_left = 1.0
+    panel.anchor_right = 1.0
+    panel.offset_left = -444.0
+    panel.offset_right = -24.0
+    panel.offset_top = 12.0
+    panel.offset_bottom = 12.0
     panel.custom_minimum_size = Vector2(420.0, 0.0)
     layer.add_child(panel)
     var margin: MarginContainer = MarginContainer.new()

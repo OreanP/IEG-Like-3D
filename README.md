@@ -2,6 +2,8 @@
 
 Prototype de football en **Godot standard 4.7 stable**, GDScript uniquement : match **11 contre 11, deux mi-temps de cinq minutes**, duels et techniques spéciales. Le terrain d’entraînement et les modèles GLB existants sont conservés.
 
+La [refonte visuelle](docs/VISUAL_UPDATE.md) ajoute un stade habité, de nouveaux joueurs riggés, des modèles détaillés pour Astreion/Thalassa, un HUD compact avec radar et portraits de duel, ainsi qu'un atelier repensé. Les captures de cette page proviennent du moteur.
+
 Ouvrir `project.godot`, attendre l'importation, puis **F5 pour le match complet de test** : 11 contre 11, terrain 60×90 m, deux mi-temps réglables, duels à temps arrêté, huit techniques ordinaires, deux signatures de Karma et atelier d'édition. Voir [docs/FULL_MATCH.md](docs/FULL_MATCH.md) pour les règles, les scènes et les résultats de validation. Le terrain d'entraînement reste accessible par le menu ou en ouvrant `scenes/training_ground.tscn` puis F6.
 
 **V / L3** ouvre les actions du match : techniques de tir, tactiques, Karma et Résonances. **Astreion et Thalassa** possèdent leurs PG, PE et techniques exclusives ; **Orbite souveraine et Vigie des profondeurs** transmettent deux techniques, des statistiques et éventuellement le Karma du donneur. Les deux familles sont cumulables, avec au maximum **3 Karma et 3 Résonances par équipe**. Le bouton **Atelier** ouvre l'éditeur sans perdre le match. Voir [le guide Karma/Résonance](docs/KARMA_RESONANCE.md) pour les propriétaires, les ressources et les champs d'édition. À la mi-temps, choisir la disposition de chaque équipe puis reprendre. `scenes/duel_preview.tscn` permet de revoir les dix animations et les variantes gardien.
