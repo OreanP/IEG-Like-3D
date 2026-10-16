@@ -5,6 +5,8 @@ extends Node3D
 const Cinematic = preload("res://scripts/presentation/duel_cinematic.gd")
 const PlayerScene = preload("res://scenes/characters/player_view.tscn")
 const Catalog = preload("res://core/content/technique_catalog.gd")
+const Arena = preload("res://scripts/match/match_arena.gd")
+const VisualTheme = preload("res://scripts/presentation/visual_theme.gd")
 const IDS: Array[String] = ["orbital_shot", "magnus_shot", "combat_blade", "drift",
     "hurricane_barrier", "aquablast", "photo_stop", "gyroscopic_stop", "perihelion_hammer", "abyssal_cathedral"]
 const NAMES: Array[String] = ["Tir orbital · TIR", "Tir Magnus · TIR", "Lame de combat · ATT", "Drift · ATT",
@@ -34,7 +36,7 @@ var _catalog: IEGTechniqueCatalog
 func _ready() -> void:
     _verify = OS.get_cmdline_user_args().has("--verify")
     _catalog = Catalog.new("user://duel_preview_verify_unused.json") if _verify else Catalog.new()
-    var environment: Node3D = preload("res://scenes/environment/training_environment.tscn").instantiate()
+    var environment: Node3D = Arena.new()
     add_child(environment)
     attacker = PlayerScene.instantiate()
     attacker.position = Vector3(0.0, 0.0, -3.0)
@@ -76,6 +78,7 @@ func _build_ui() -> void:
     var layer: CanvasLayer = CanvasLayer.new()
     add_child(layer)
     var panel: PanelContainer = PanelContainer.new()
+    panel.theme = VisualTheme.make_theme()
     panel.position = Vector2(24.0, 12.0)
     panel.custom_minimum_size = Vector2(420.0, 0.0)
     layer.add_child(panel)
@@ -88,6 +91,7 @@ func _build_ui() -> void:
     margin.add_child(column)
     var title: Label = Label.new()
     title.text = "ATELIER · TECHNIQUES"
+    title.add_theme_font_override("font", VisualTheme.display_font())
     title.add_theme_font_size_override("font_size", 22)
     column.add_child(title)
     var description: Label = Label.new()
@@ -120,11 +124,18 @@ func _build_ui() -> void:
     _status.text = "Préparation"
     column.add_child(_status)
     _scores = Label.new()
-    _scores.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-    _scores.position = Vector2(380.0, 615.0)
+    _scores.anchor_left = 0.5
+    _scores.anchor_right = 0.5
+    _scores.anchor_top = 1.0
+    _scores.anchor_bottom = 1.0
+    _scores.offset_left = -300.0
+    _scores.offset_right = 300.0
+    _scores.offset_top = -150.0
+    _scores.offset_bottom = -32.0
     _scores.custom_minimum_size = Vector2(600.0, 110.0)
     _scores.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     _scores.add_theme_font_size_override("font_size", 32)
+    _scores.add_theme_font_override("font", VisualTheme.display_font())
     _scores.add_theme_color_override("font_color", Color("fff2ba"))
     _scores.add_theme_color_override("font_shadow_color", Color.BLACK)
     _scores.add_theme_constant_override("shadow_offset_x", 3)

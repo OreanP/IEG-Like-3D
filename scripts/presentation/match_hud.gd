@@ -15,10 +15,14 @@ signal modifier_requested(content_id: String, player_id: int)
 signal modifier_release_requested(category: String, player_id: int)
 signal menu_opened
 
-const INK := Color("edf4f8")
-const MUTED := Color("adc3d2")
-const GOLD := Color("ffda8c")
-const AQUA := Color("7ae8dc")
+const VisualTheme = preload("res://scripts/presentation/visual_theme.gd")
+const PlayerPortrait = preload("res://scripts/presentation/player_portrait.gd")
+const INK := Color("f4f0df")
+const MUTED := Color("a6b9c8")
+const GOLD := Color("e5af65")
+const AQUA := Color("4bd9c3")
+const CORAL := Color("e58d86")
+const NAVY := Color("101e31")
 var _root: Control
 var _score: Label
 var _clock: Label
@@ -56,114 +60,235 @@ var _live_panels: Array[Control] = []
 var _modal_notice: Label
 var _armed_name: String = ""
 var _duel_tech_buttons: Array[Button] = []
+var _duel_portraits: Array[Control] = []
+var _player_panel: PanelContainer
+var _player_column: VBoxContainer
+var _menu_panel: PanelContainer
+var _menu_scroll: ScrollContainer
+var _help_panel: Control
+var _help_button: Button
+var _help_open: bool = false
+var _control_hint: Label
+var _tools_panel: Control
+var _score_panel: Control
+var _keeper_panel: Control
+var _last_player_height: float = 0.0
+var _radar: Control
 
 func _ready() -> void:
     layer = 10
     process_mode = Node.PROCESS_MODE_ALWAYS
     _root = Control.new()
+    _root.theme = VisualTheme.make_theme()
     _root.mouse_filter = Control.MOUSE_FILTER_IGNORE
     add_child(_root)
     _root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    var brand: VBoxContainer = _panel(Vector2.ZERO, Rect2(20, 18, 246, 101))
-    _live_panels.append(brand.get_parent())
-    _text(brand, "IEG  /  MATCH", 20, GOLD)
-    _phase_label = _text(brand, "11 contre 11 · 60 × 90 m", 14, MUTED)
-    _text(brand, "Azur  /  Carmin", 14, INK)
-    var scores: VBoxContainer = _panel(Vector2(0.5, 0), Rect2(-220, 18, 440, 108))
-    _score = _text(scores, "AZUR   0 — 0   CARMIN", 27, INK)
+
+    # Une seule régie TV ; le terrain reste le point d'attention.
+    var scores: VBoxContainer = _panel(Vector2.ZERO, Rect2(24, 22, 414, 86))
+    _score_panel = scores.get_parent()
+    _live_panels.append(_score_panel)
+    var scoreboard_header := HBoxContainer.new()
+    scores.add_child(scoreboard_header)
+    _phase_label = _text(scoreboard_header, "MATCH AMICAL · 11 V 11", 11, MUTED)
+    _phase_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    _clock = _text(scoreboard_header, "1re · 05:00", 14, GOLD)
+    _clock.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+    var score_line := HBoxContainer.new()
+    score_line.add_theme_constant_override("separation", 10)
+    scores.add_child(score_line)
+    _crest(score_line, "res://assets/ui/azur_crest.svg", 29)
+    _score = _text(score_line, "AZUR   0 — 0   CARMIN", 26, INK)
+    _score.add_theme_font_override("font", VisualTheme.display_font())
+    _score.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     _score.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    _clock = _text(scores, "1re MI-TEMPS  ·  05:00", 19, GOLD)
-    _clock.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    var tools: VBoxContainer = _panel(Vector2(1, 0), Rect2(-250, 18, 230, 101))
-    _live_panels.append(tools.get_parent())
-    var row := HBoxContainer.new()
-    tools.add_child(row)
-    _button(row, "Pause", func(): pause_requested.emit(), 37)
-    _button(row, "Atelier", func(): editor_requested.emit(), 37)
-    _text(tools, "Start / Échap · V : actions", 13, MUTED)
-    var keeper_panel: VBoxContainer = _panel(Vector2(0.5, 0), Rect2(-230, 134, 460, 88))
-    _live_panels.append(keeper_panel.get_parent())
+    _crest(score_line, "res://assets/ui/carmin_crest.svg", 29)
+
+    var keepers: VBoxContainer = _panel(Vector2.ZERO, Rect2(24, 112, 414, 64))
+    _keeper_panel = keepers.get_parent()
+    _live_panels.append(_keeper_panel)
     var keeper_row := HBoxContainer.new()
-    keeper_row.add_theme_constant_override("separation", 24)
-    keeper_panel.add_child(keeper_row)
+    keeper_row.add_theme_constant_override("separation", 22)
+    keepers.add_child(keeper_row)
     for team: int in range(2):
         var keeper_column := VBoxContainer.new()
+        keeper_column.add_theme_constant_override("separation", 4)
         keeper_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         keeper_row.add_child(keeper_column)
-        _keeper_labels.append(_text(keeper_column, "Gardien " + ("Azur" if team == 0 else "Carmin"), 13, AQUA if team == 0 else Color("ff9d9a")))
-        _keeper_bars.append(_bar(keeper_column, 100, AQUA if team == 0 else Color("ff9d9a")))
-        _team_modifier_counts.append(_text(keeper_column, "Karma 0/3 · Resonance 0/3", 12, MUTED))
-    var player_panel: VBoxContainer = _panel(Vector2(0, 1), Rect2(20, -384, 380, 364))
-    _live_panels.append(player_panel.get_parent())
-    _player = _text(player_panel, "Joueur", 21, INK)
-    _status = _text(player_panel, "Endurance", 13, MUTED)
-    _energy = _bar(player_panel, 100, GOLD)
-    _charge = _bar(player_panel, 1, AQUA)
-    _karma_pg_label = _text(player_panel, "", 13, GOLD)
-    _karma_pg_bar = _bar(player_panel, 300, GOLD)
+        var color: Color = AQUA if team == 0 else CORAL
+        _keeper_labels.append(_text(keeper_column, "GARDIEN " + ("AZUR" if team == 0 else "CARMIN"), 11, color))
+        var keeper_bar: ProgressBar = _bar(keeper_column, 100, color)
+        keeper_bar.custom_minimum_size.y = 3
+        _keeper_bars.append(keeper_bar)
+        _team_modifier_counts.append(_text(keeper_column, "Karma 0/3 · Resonance 0/3", 11, MUTED))
+
+    var tools: VBoxContainer = _panel(Vector2(1, 0), Rect2(-216, 22, 192, 44))
+    _tools_panel = tools.get_parent()
+    _live_panels.append(_tools_panel)
+    var tools_row := HBoxContainer.new()
+    tools_row.add_theme_constant_override("separation", 8)
+    tools.add_child(tools_row)
+    _button(tools_row, "Pause", func(): pause_requested.emit(), 30)
+    _button(tools_row, "Atelier", func(): editor_requested.emit(), 30)
+
+    _player_column = _panel(Vector2(0, 1), Rect2(24, -210, 338, 188))
+    _player_panel = _player_column.get_parent()
+    _live_panels.append(_player_panel)
+    var player_eyebrow := HBoxContainer.new()
+    _player_column.add_child(player_eyebrow)
+    var selected_label: Label = _text(player_eyebrow, "JOUEUR SÉLECTIONNÉ", 11, AQUA)
+    selected_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    _text(player_eyebrow, "AZUR", 11, MUTED)
+    _player = _text(_player_column, "Joueur", 25, INK)
+    _player.add_theme_font_override("font", VisualTheme.display_font())
+    _status = _text(_player_column, "Porteur · Endurance", 12, MUTED)
+    _energy = _bar(_player_column, 100, GOLD)
+    _charge = _bar(_player_column, 1, AQUA)
+    _charge.visible = false
+    _karma_pg_label = _text(_player_column, "", 11, GOLD)
+    _karma_pg_bar = _bar(_player_column, 300, GOLD)
     _karma_pg_label.visible = false
     _karma_pg_bar.visible = false
     for category: String in ["KARMA", "RESONANCE"]:
-        var color: Color = AQUA if category == "KARMA" else Color("c3a2ff")
-        var modifier_label: Label = _text(player_panel, "", 13, color)
-        var modifier_bar: ProgressBar = _bar(player_panel, 100, color)
+        var color: Color = AQUA if category == "KARMA" else Color("c2ade9")
+        var modifier_label: Label = _text(_player_column, "", 11, color)
+        var modifier_bar: ProgressBar = _bar(_player_column, 100, color)
         _modifier_labels[category] = modifier_label
         _modifier_bars[category] = modifier_bar
         modifier_label.visible = false
         modifier_bar.visible = false
-    _stat_label = _text(player_panel, "", 12, GOLD)
+    _stat_label = _text(_player_column, "", 11, GOLD)
     _stat_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    _inherited_label = _text(player_panel, "", 12, AQUA)
+    _inherited_label = _text(_player_column, "", 11, AQUA)
     _inherited_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     var player_tools := HBoxContainer.new()
-    player_panel.add_child(player_tools)
-    _button(player_tools, "Techniques", func(): open_actions("TIR"), 32)
-    _button(player_tools, "Tactique", func(): open_actions("TAC"), 32)
-    var modifiers := HBoxContainer.new()
-    player_panel.add_child(modifiers)
-    _button(modifiers, "Karma", func(): open_actions("KARMA"), 30)
-    _button(modifiers, "Resonance", func(): open_actions("RESONANCE"), 30)
-    var help_panel: VBoxContainer = _panel(Vector2.ONE, Rect2(-485, -177, 465, 157))
-    _live_panels.append(help_panel.get_parent())
-    _help = _text(help_panel, "", 14, INK)
+    player_tools.add_theme_constant_override("separation", 5)
+    _player_column.add_child(player_tools)
+    _button(player_tools, "Techniques", func(): open_actions("TIR"), 30)
+    _button(player_tools, "Tactique", func(): open_actions("TAC"), 30)
+    _button(player_tools, "Karma", func(): open_actions("KARMA"), 30)
+    _button(player_tools, "Resonance", func(): open_actions("RESONANCE"), 30)
+
+    # L'aide détaillée ne recouvre le terrain que sur demande.
+    var help: VBoxContainer = _panel(Vector2.ONE, Rect2(-424, -368, 400, 142))
+    _help_panel = help.get_parent()
+    _live_panels.append(_help_panel)
+    _text(help, "COMMANDES", 12, GOLD)
+    _help = _text(help, "", 13, INK)
     _help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    _message = _text(_root, "", 20, GOLD)
+    _help_panel.visible = false
+    _help_button = _button(_root, "?  Commandes", _toggle_help, 32)
+    _help_button.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+    _help_button.offset_left = -156
+    _help_button.offset_right = -24
+    _help_button.offset_top = -208
+    _help_button.offset_bottom = -176
+    _live_panels.append(_help_button)
+    _control_hint = _text(_root, "V · Actions    Échap · Pause", 11, INK)
+    _control_hint.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+    _control_hint.offset_left = -310
+    _control_hint.offset_right = -170
+    _control_hint.offset_top = -199
+    _control_hint.offset_bottom = -178
+    _control_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+    _control_hint.add_theme_color_override("font_shadow_color", NAVY)
+    _control_hint.add_theme_constant_override("shadow_offset_y", 1)
+    _live_panels.append(_control_hint)
+    if ResourceLoader.exists("res://scripts/presentation/tactical_radar.gd"):
+        var radar_script: Script = load("res://scripts/presentation/tactical_radar.gd")
+        _radar = radar_script.new()
+        _root.add_child(_radar)
+        _radar.anchor_left = 1
+        _radar.anchor_right = 1
+        _radar.anchor_top = 1
+        _radar.anchor_bottom = 1
+        _radar.offset_left = -218
+        _radar.offset_right = -24
+        _radar.offset_top = -166
+        _radar.offset_bottom = -24
+        _live_panels.append(_radar)
+
+    _message = _text(_root, "", 18, INK)
     _message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     _message.anchor_left = 0.5
     _message.anchor_right = 0.5
-    _message.offset_left = -480
-    _message.offset_right = 480
-    _message.offset_top = 220
-    _message.offset_bottom = 254
-    _message.add_theme_color_override("font_shadow_color", Color("14232b"))
-    _message.add_theme_constant_override("shadow_offset_x", 2)
+    _message.offset_left = -420
+    _message.offset_right = 420
+    _message.offset_top = 190
+    _message.offset_bottom = 228
+    _message.add_theme_color_override("font_shadow_color", NAVY)
+    _message.add_theme_constant_override("shadow_offset_x", 1)
     _message.add_theme_constant_override("shadow_offset_y", 2)
+
     _overlay = ColorRect.new()
-    _overlay.color = Color(0.015, 0.035, 0.065, 0.90)
+    _overlay.color = Color(0.025, 0.055, 0.09, 0.70)
     _overlay.visible = false
     _root.add_child(_overlay)
     _overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    var center := CenterContainer.new()
-    _overlay.add_child(center)
-    center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    var scroll := ScrollContainer.new()
-    scroll.custom_minimum_size = Vector2(680, 560)
-    scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-    scroll.follow_focus = true
-    center.add_child(scroll)
+    _menu_panel = PanelContainer.new()
+    _menu_panel.add_theme_stylebox_override("panel", _menu_style())
+    _overlay.add_child(_menu_panel)
+    _menu_panel.anchor_left = 0.5
+    _menu_panel.anchor_right = 0.5
+    _menu_panel.anchor_top = 0.5
+    _menu_panel.anchor_bottom = 0.5
+    _menu_scroll = ScrollContainer.new()
+    _menu_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+    _menu_scroll.follow_focus = true
+    _menu_panel.add_child(_menu_scroll)
     _column = VBoxContainer.new()
     _column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    _column.add_theme_constant_override("separation", 14)
-    scroll.add_child(_column)
-    var cinema: VBoxContainer = _panel(Vector2(0.5, 1), Rect2(-350, -185, 700, 165))
+    _column.add_theme_constant_override("separation", 12)
+    _menu_scroll.add_child(_column)
+
+    var cinema: VBoxContainer = _panel(Vector2(0.5, 1), Rect2(-310, -126, 620, 104))
     _cinema_panel = cinema.get_parent()
     _cinema_panel.visible = false
-    _cinematic_title = _text(cinema, "", 19, AQUA)
+    _cinematic_title = _text(cinema, "", 13, AQUA)
     _cinematic_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    _cinematic_scores = _text(cinema, "", 42, INK)
+    _cinematic_scores = _text(cinema, "", 30, INK)
+    _cinematic_scores.add_theme_font_override("font", VisualTheme.display_font())
     _cinematic_scores.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    _cinematic_winner = _text(cinema, "", 23, GOLD)
+    _cinematic_winner = _text(cinema, "", 14, GOLD)
     _cinematic_winner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    get_viewport().size_changed.connect(_layout)
+    _layout.call_deferred()
+
+func _toggle_help() -> void:
+    _help_open = not _help_open
+    _help_panel.visible = _help_open
+    _help_button.text = "×  Fermer l'aide" if _help_open else "?  Commandes"
+
+func _layout() -> void:
+    if not is_instance_valid(_root) or not is_inside_tree():
+        return
+    var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+    var portrait_size: Vector2 = Vector2(84, 92) if viewport_size.y < 700 else Vector2(128, 140)
+    for portrait: Control in _duel_portraits:
+        if is_instance_valid(portrait) and portrait.custom_minimum_size != portrait_size:
+            portrait.custom_minimum_size = portrait_size
+    var menu_width: float = minf(728, viewport_size.x - 64)
+    var menu_height: float = minf(maxf(240, _column.get_combined_minimum_size().y + 48), viewport_size.y - 72)
+    _menu_panel.offset_left = -menu_width * 0.5
+    _menu_panel.offset_right = menu_width * 0.5
+    _menu_panel.offset_top = -menu_height * 0.5
+    _menu_panel.offset_bottom = menu_height * 0.5
+    _menu_scroll.custom_minimum_size = Vector2(menu_width - 48, menu_height - 48)
+    var player_height: float = _player_column.get_combined_minimum_size().y + 22
+    _player_panel.offset_top = -player_height - 22
+    _player_panel.offset_bottom = -22
+    _last_player_height = player_height
+
+func _crest(parent: Node, path: String, side: float) -> void:
+    if not ResourceLoader.exists(path):
+        return
+    var crest := TextureRect.new()
+    crest.texture = load(path)
+    crest.custom_minimum_size = Vector2(side, side)
+    crest.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+    crest.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+    crest.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    parent.add_child(crest)
 
 func set_catalogue(definitions: Array) -> void:
     _definitions = definitions
@@ -185,11 +310,13 @@ func clear_armed_technique() -> void:
 func refresh(delta: float, session, controls: IEGLocalPlayerInput, paused: bool) -> void:
     _session = session
     var player: IEGPlayerState = session.controlled()
+    if is_instance_valid(_radar):
+        _radar.call("update_match", session)
     _score.text = "%s   %d — %d   %s" % [session.team_names[0].to_upper(), session.team_goals[0], session.team_goals[1], session.team_names[1].to_upper()]
     var remaining: int = maxi(0, ceili(session.half_duration - session.elapsed_half))
     var frozen: bool = session.phase != session.Phase.LIVE
-    _clock.text = "%s · %02d:%02d%s" % ["1re MI-TEMPS" if session.period == 1 else "2e MI-TEMPS", remaining / 60, remaining % 60, "  ⏸" if frozen or paused else ""]
-    _phase_label.text = "11 contre 11 · 60 × 90 m"
+    _clock.text = "%s · %02d:%02d%s" % ["1re" if session.period == 1 else "2e", remaining / 60, remaining % 60, "  II" if frozen or paused else ""]
+    _phase_label.text = "MATCH AMICAL · 11 V 11"
     _player.text = "%02d / %s" % [player.profile.shirt_number, player.profile.display_name]
     _status.text = "Porteur · Endurance" if session.ball.owner_id == player.get_id() else "Sans ballon · Endurance"
     if player.is_goalkeeper:
@@ -204,11 +331,15 @@ func refresh(delta: float, session, controls: IEGLocalPlayerInput, paused: bool)
         if state.is_goalkeeper:
             var value: float = float(state.get("keeper_stamina"))
             _keeper_bars[state.team_id].value = value
-            _keeper_labels[state.team_id].text = "Gardien %s · %d / 100" % [session.team_names[state.team_id], roundi(value)]
+            _keeper_labels[state.team_id].text = "GARDIEN %s · %d" % [session.team_names[state.team_id].to_upper(), roundi(value)]
     for team: int in range(2):
         _team_modifier_counts[team].text = "Karma %d/3 · Resonance %d/3" % [session.count_active_modifiers(team, "KARMA"), session.count_active_modifiers(team, "RESONANCE")]
     _help.text = ("Stick G : déplacement · RT : sprint\nA : passe · Y : lob · X : tir chargé · B : tacle\nRB : cible · LB : joueur · Stick D : caméra\nL3 / V : techniques et tactiques · Start : pause"
         if controls.uses_gamepad else "ZQSD / WASD : mouvement · Maj : sprint\nEspace : passe · G : lob · E : tacle · Q : cible\nF / clic G : tir chargé · Tab : joueur\nClic D : caméra · V : actions · Échap : pause")
+    _control_hint.text = "L3 · Actions    Start · Pause" if controls.uses_gamepad else "V · Actions    Échap · Pause"
+    var desired_height: float = _player_column.get_combined_minimum_size().y + 22
+    if absf(desired_height - _last_player_height) > 1.0:
+        _layout.call_deferred()
     _message_life = maxf(0, _message_life - delta)
     _message.visible = _message_life > 0 and session.phase == session.Phase.LIVE and not _overlay.visible
     if session.phase != _last_phase:
@@ -235,6 +366,7 @@ func close_overlay() -> void:
     _cinema_panel.visible = false
     for panel: Control in _live_panels:
         panel.visible = true
+    _help_panel.visible = _help_open
     _mode = ""
     var focused: Control = get_viewport().gui_get_focus_owner()
     if focused != null:
@@ -242,25 +374,30 @@ func close_overlay() -> void:
 
 func _reset_overlay(mode: String, title: String, description: String = "") -> void:
     _mode = mode
+    _message.visible = false
+    _layout.call_deferred()
     _modal_notice = null
     _cinema_panel.visible = false
     for panel: Control in _live_panels:
-        panel.visible = true
-    _overlay.color = Color(0.015, 0.035, 0.065, 0.90)
+        panel.visible = false
+    _overlay.color = Color(0.025, 0.055, 0.09, 0.70)
     _overlay.mouse_filter = Control.MOUSE_FILTER_STOP
     for child: Node in _column.get_children():
         child.free()
     _duel_tech_buttons.clear()
+    _duel_portraits.clear()
     _overlay.visible = true
-    var heading: Label = _text(_column, title, 36, GOLD)
+    _text(_column, "IEG  /  MATCH", 11, AQUA)
+    var heading: Label = _text(_column, title, 32, INK)
+    heading.add_theme_font_override("font", VisualTheme.display_font())
     heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     if not description.is_empty():
-        var subtitle: Label = _text(_column, description, 17, MUTED)
+        var subtitle: Label = _text(_column, description, 14, MUTED)
         subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 func _show_pause() -> void:
-    _reset_overlay("pause", "PAUSE", "Match 11 contre 11 · Le chrono est arrêté.")
+    _reset_overlay("pause", "Le match vous attend", "PAUSE · Le chrono est arrêté.")
     var first: Button = _button(_column, "Reprendre le match", func(): resume_requested.emit())
     _button(_column, "Techniques de tir", func(): open_actions("TIR"))
     _button(_column, "Tactiques collectives", func(): open_actions("TAC"))
@@ -277,7 +414,18 @@ func _show_duel() -> void:
     var category: String = ("TIR" if attack else "GAR") if keeper else (("TIR" if attack else "DEF") if block else ("ATT" if attack else "DEF"))
     var title: String = "TIREUR / GARDIEN" if keeper else ("TIR / BLOCAGE" if block else "FACE-À-FACE")
     var intent: String = ("Choisissez le côté de votre tir." if attack else "Anticipez le côté du tir.") if keeper or block else ("Choisissez votre dribble." if attack else "Choisissez votre intervention.")
-    _reset_overlay("duel", title, intent + "\nTemps arrêté · aucun choix automatique pour le joueur.")
+    _reset_overlay("duel", title, intent + " Temps arrêté.")
+    var confrontation := HBoxContainer.new()
+    confrontation.add_theme_constant_override("separation", 14)
+    _column.add_child(confrontation)
+    var attacker: IEGPlayerState = _session.get_player(int(duel.get("actor_id", -1)))
+    var defender: IEGPlayerState = _session.get_player(int(duel.get("target_id", -1)))
+    _duel_portrait(confrontation, attacker, "TIREUR" if keeper or block else "ATTAQUE")
+    var versus: Label = _text(confrontation, "VS", 27, GOLD)
+    versus.add_theme_font_override("font", VisualTheme.display_font())
+    versus.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+    versus.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    _duel_portrait(confrontation, defender, "GARDIEN" if keeper else "DÉFENSE")
     var row := HBoxContainer.new()
     row.add_theme_constant_override("separation", 16)
     _column.add_child(row)
@@ -289,14 +437,44 @@ func _show_duel() -> void:
         var actor: IEGPlayerState = _duel_actor()
         var prepaid: bool = attack and id == str(duel.get("prepaid_technique", ""))
         var cost: String = "déjà payée" if prepaid else _cost_text(definition)
-        var special: Button = _button(_column, "%s  ·  %s" % [_definition_name(definition), cost], func(): duel_choice_requested.emit("special", id))
+        var special: Button = _technique_card(definition, func(): duel_choice_requested.emit("special", id), cost)
         special.disabled = not prepaid and not _session.can_use_technique(actor.get_id(), id, category)
         _duel_tech_buttons.append(special)
-        _description(definition)
-    _text(_column, "Croix directionnelle / flèches : naviguer · A / Entrée : valider", 14, MUTED)
+    _text(_column, "Croix / flèches · Naviguer     A / Entrée · Valider", 12, MUTED)
     _modal_notice = _text(_column, "", 15, GOLD)
     _modal_notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     first.grab_focus()
+
+func _duel_portrait(parent: Node, state: IEGPlayerState, role: String) -> void:
+    if state == null:
+        return
+    var card := PanelContainer.new()
+    card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    var style: StyleBoxFlat = _style(Color("11263a"))
+    style.border_color = Color(AQUA if state.team_id == _session.LOCAL_TEAM else CORAL, 0.38)
+    style.shadow_size = 0
+    style.content_margin_top = 7
+    style.content_margin_bottom = 8
+    card.add_theme_stylebox_override("panel", style)
+    parent.add_child(card)
+    var contents := VBoxContainer.new()
+    contents.add_theme_constant_override("separation", 3)
+    card.add_child(contents)
+    var team: Label = _text(contents, "%s · %s" % [_session.team_names[state.team_id].to_upper(), role], 10, AQUA if state.team_id == _session.LOCAL_TEAM else CORAL)
+    team.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    var center := CenterContainer.new()
+    center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    contents.add_child(center)
+    var portrait = PlayerPortrait.new()
+    portrait.custom_minimum_size = Vector2(128, 140)
+    portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    _duel_portraits.append(portrait)
+    center.add_child(portrait)
+    portrait.set_profile(state.profile, state.is_goalkeeper)
+    var name_label: Label = _text(contents, "%02d · %s" % [state.profile.shirt_number, state.profile.display_name], 16, INK)
+    name_label.add_theme_font_override("font", VisualTheme.bold_font())
+    name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 
 func _show_cinematic() -> void:
     _mode = "cinematic"
@@ -368,7 +546,7 @@ func open_actions(category: String = "TIR", player_id: int = -1) -> void:
     var names: Dictionary = {"TIR": "TECHNIQUES DE TIR", "TAC": "TACTIQUES", "KARMA": "Karma", "RESONANCE": "Resonance"}
     var description: String = "Le chrono est arrêté pendant ce choix."
     if category in ["KARMA", "RESONANCE"]:
-        description += "\nKarma et Resonance peuvent se cumuler sur un joueur.\nTrois Karma et trois Resonance maximum par équipe."
+        description += "\nCumul autorisé · 3 Karma et 3 Resonance par équipe."
         description += "\nActifs dans votre équipe : Karma %d/3 · Resonance %d/3" % [_session.count_active_modifiers(0, "KARMA"), _session.count_active_modifiers(0, "RESONANCE")]
     _reset_overlay("actions_" + category, str(names.get(category, category)), description)
     if category in ["KARMA", "RESONANCE"]:
@@ -380,19 +558,18 @@ func open_actions(category: String = "TIR", player_id: int = -1) -> void:
         receiver_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         receiver_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         _button(receiver_row, "Joueur →", func(): _cycle_receiver(category, 1), 38)
-        _text(_column, "Choisir un receveur ne change ni le porteur ni la sélection en jeu.", 13, MUTED)
+        _text(_column, "Choisissez le joueur qui recevra cette transformation.", 12, MUTED)
         for active: Dictionary in _session.get_active_modifiers(_action_player_id):
             if str(active.get("category", "")) == category:
                 _button(_column, "Dissiper : " + _name_for_id(str(active.get("id", ""))), func(): modifier_release_requested.emit(category, _action_player_id))
     var first: Button = null
     for definition: Dictionary in _for_category(category):
         var id: String = str(definition.get("id", ""))
-        var button: Button = _button(_column, "%s  ·  %s" % [_definition_name(definition), _cost_text(definition)], func(): _activate_content(category, id))
+        var button: Button = _technique_card(definition, func(): _activate_content(category, id))
         if category == "TIR":
             button.disabled = not _session.can_use_technique(_session.controlled_id, id, category)
         if first == null:
             first = button
-        _description(definition)
     if first == null:
         _text(_column, "Aucune entrée disponible dans cette catégorie.", 18, MUTED)
     if category == "KARMA":
@@ -489,7 +666,9 @@ func _refresh_modifiers(session, player: IEGPlayerState) -> void:
     for stat: String in stat_names:
         if float(bonuses.get(stat, 0.0)) > 0.0:
             displayed.append("%s +%.0f" % [stat_names[stat], bonuses[stat]])
-    _stat_label.text = " · ".join(displayed)
+    _stat_label.text = " · ".join(displayed.slice(0, 3))
+    if displayed.size() > 3:
+        _stat_label.text += "\n" + " · ".join(displayed.slice(3))
     _stat_label.visible = not displayed.is_empty()
 
 func _modifier_max_energy(id: String) -> float:
@@ -526,7 +705,7 @@ func _description(definition: Dictionary) -> void:
 func _panel(anchor: Vector2, rectangle: Rect2) -> VBoxContainer:
     var panel := PanelContainer.new()
     panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-    panel.add_theme_stylebox_override("panel", _style(Color(0.018, 0.045, 0.08, 0.94)))
+    panel.add_theme_stylebox_override("panel", _style(Color(0.035, 0.067, 0.105, 0.94)))
     _root.add_child(panel)
     panel.anchor_left = anchor.x
     panel.anchor_right = anchor.x
@@ -537,20 +716,34 @@ func _panel(anchor: Vector2, rectangle: Rect2) -> VBoxContainer:
     panel.offset_top = rectangle.position.y
     panel.offset_bottom = rectangle.end.y
     var column := VBoxContainer.new()
-    column.add_theme_constant_override("separation", 5)
+    column.add_theme_constant_override("separation", 4)
     panel.add_child(column)
     return column
 
 func _style(color: Color) -> StyleBoxFlat:
     var style := StyleBoxFlat.new()
     style.bg_color = color
-    style.border_color = Color("395667")
+    style.border_color = Color(0.38, 0.50, 0.58, 0.24)
     style.set_border_width_all(1)
-    style.set_corner_radius_all(9)
-    style.content_margin_left = 14
-    style.content_margin_right = 14
-    style.content_margin_top = 11
-    style.content_margin_bottom = 11
+    style.border_width_top = 2
+    style.set_corner_radius_all(4)
+    style.content_margin_left = 12
+    style.content_margin_right = 12
+    style.content_margin_top = 9
+    style.content_margin_bottom = 9
+    style.shadow_color = Color(0, 0, 0, 0.16)
+    style.shadow_size = 9
+    return style
+
+func _menu_style() -> StyleBoxFlat:
+    var style: StyleBoxFlat = _style(Color(0.045, 0.085, 0.14, 0.98))
+    style.border_color = Color(0.55, 0.67, 0.73, 0.30)
+    style.border_width_top = 2
+    style.content_margin_left = 24
+    style.content_margin_right = 24
+    style.content_margin_top = 24
+    style.content_margin_bottom = 24
+    style.shadow_size = 30
     return style
 
 func _text(parent: Node, value: String, size: int, color: Color) -> Label:
@@ -567,27 +760,82 @@ func _bar(parent: Node, maximum: float, color: Color) -> ProgressBar:
     bar.max_value = maximum
     bar.value = maximum
     bar.show_percentage = false
-    bar.custom_minimum_size = Vector2(0, 9)
+    bar.custom_minimum_size = Vector2(0, 5)
     var background := StyleBoxFlat.new()
-    background.bg_color = Color("233a48")
-    background.set_corner_radius_all(4)
+    background.bg_color = Color("28384a")
+    background.set_corner_radius_all(2)
     var fill := StyleBoxFlat.new()
     fill.bg_color = color
-    fill.set_corner_radius_all(4)
+    fill.set_corner_radius_all(2)
     bar.add_theme_stylebox_override("background", background)
     bar.add_theme_stylebox_override("fill", fill)
     parent.add_child(bar)
     return bar
 
-func _button(parent: Node, value: String, callback: Callable, height: float = 46) -> Button:
+func _button(parent: Node, value: String, callback: Callable, height: float = 44) -> Button:
     var button := Button.new()
     button.text = value
     button.custom_minimum_size = Vector2(0, height)
     button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    button.add_theme_font_size_override("font_size", 18 if height > 37 else 13)
-    button.add_theme_stylebox_override("normal", _style(Color("153448")))
-    button.add_theme_stylebox_override("hover", _style(Color("245871")))
-    button.add_theme_stylebox_override("focus", _style(Color("32657c")))
+    button.add_theme_font_size_override("font_size", 16 if height > 37 else 11)
+    button.add_theme_color_override("font_color", INK)
+    button.add_theme_color_override("font_hover_color", INK)
+    button.add_theme_color_override("font_focus_color", GOLD)
+    button.add_theme_color_override("font_disabled_color", Color("71818f"))
+    var normal: StyleBoxFlat = _style(Color("172b40"))
+    normal.set_border_width_all(1)
+    normal.shadow_size = 0
+    normal.content_margin_top = 5
+    normal.content_margin_bottom = 5
+    normal.content_margin_left = 10
+    normal.content_margin_right = 10
+    button.add_theme_stylebox_override("normal", normal)
+    var hover: StyleBoxFlat = normal.duplicate()
+    hover.bg_color = Color("233c51")
+    hover.border_color = AQUA
+    button.add_theme_stylebox_override("hover", hover)
+    var pressed: StyleBoxFlat = hover.duplicate()
+    pressed.bg_color = Color("30465a")
+    button.add_theme_stylebox_override("pressed", pressed)
+    var disabled: StyleBoxFlat = normal.duplicate()
+    disabled.bg_color = Color("112235")
+    button.add_theme_stylebox_override("disabled", disabled)
+    var focus := StyleBoxFlat.new()
+    focus.bg_color = Color(0, 0, 0, 0)
+    focus.border_color = GOLD
+    focus.set_border_width_all(2)
+    focus.set_corner_radius_all(4)
+    focus.expand_margin_left = 2
+    focus.expand_margin_right = 2
+    focus.expand_margin_top = 2
+    focus.expand_margin_bottom = 2
+    button.add_theme_stylebox_override("focus", focus)
     parent.add_child(button)
     button.pressed.connect(callback)
+    return button
+
+func _technique_card(definition: Dictionary, callback: Callable, cost: String = "") -> Button:
+    var card := PanelContainer.new()
+    var card_style: StyleBoxFlat = _style(Color("13283c"))
+    card_style.shadow_size = 0
+    card_style.content_margin_left = 12
+    card_style.content_margin_right = 12
+    card_style.content_margin_top = 8
+    card_style.content_margin_bottom = 10
+    card_style.border_width_left = 3
+    var category: String = str(definition.get("category", "TIR"))
+    card_style.border_color = Color(GOLD, 0.45) if category in ["TIR", "KARMA"] else Color(AQUA, 0.40)
+    card.add_theme_stylebox_override("panel", card_style)
+    _column.add_child(card)
+    var contents := VBoxContainer.new()
+    contents.add_theme_constant_override("separation", 5)
+    card.add_child(contents)
+    var cost_text: String = _cost_text(definition) if cost.is_empty() else cost
+    var button: Button = _button(contents, "%s  ·  %s" % [_definition_name(definition), cost_text], callback, 42)
+    button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+    button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    var description: String = str(definition.get("description", ""))
+    if not description.is_empty():
+        var label: Label = _text(contents, description, 13, MUTED)
+        label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     return button

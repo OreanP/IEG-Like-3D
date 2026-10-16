@@ -41,9 +41,13 @@ var _observed_phase: int = -1
 var _armed_technique: String = ""
 var _editor_layer: CanvasLayer
 var _editor_previous_focus: Control
+var _original_scale_size: Vector2i
 
 func _ready() -> void:
     process_mode = Node.PROCESS_MODE_ALWAYS
+    _original_scale_size = get_window().content_scale_size
+    get_window().size_changed.connect(_fit_interface)
+    _fit_interface()
     if OS.get_cmdline_user_args().has("--smoke"):
         half_seconds = 2.0
         auto_pause_on_focus_loss = false
@@ -51,7 +55,9 @@ func _ready() -> void:
     controls.charge_seconds = shot_charge_seconds
     camera_rig.mouse_sensitivity = mouse_sensitivity
     camera_rig.stick_sensitivity = stick_camera_speed
-    camera_rig.distance = 22.0
+    camera_rig.distance = 20.0
+    camera_rig.home_pitch = 0.62
+    camera_rig.camera.fov = 56.0
     var roster: Dictionary = Roster.build()
     session = Session.new(roster.profiles, roster.starts, roster.teams, roster.keepers, half_seconds)
     _catalogue = session.catalog
@@ -101,7 +107,7 @@ func _ready() -> void:
     _sync_phase()
     _sync_views(Rules.TICK)
     hud.refresh(0, session, controls, false)
-    hud.show_message("Match 11 contre 11 · Deux mi-temps de %d minutes." % maxi(1, ceili(half_seconds / 60)))
+    hud.show_message("À vous de jouer.", 1.8)
     print("IEG match : 22 joueurs, terrain 60 × 90 m, 2 × %.0f secondes." % half_seconds)
 
 func _input(event: InputEvent) -> void:
@@ -125,11 +131,21 @@ func _notification(what: int) -> void:
         _set_paused(true)
 
 func _exit_tree() -> void:
+    var window: Window = get_window()
+    if window != null and window.size_changed.is_connected(_fit_interface):
+        window.size_changed.disconnect(_fit_interface)
+        window.content_scale_size = _original_scale_size
     if _cinematic != null:
         _cinematic.stop()
     Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
     if get_tree() != null:
         get_tree().paused = false
+
+func _fit_interface() -> void:
+    var window: Window = get_window()
+    var target := Vector2i(clampi(window.size.x, 960, 1280), clampi(window.size.y, 600, 800))
+    if window.content_scale_size != target:
+        window.content_scale_size = target
 
 func _physics_process(_delta: float) -> void:
     if not _ready_complete or _paused or is_instance_valid(_editor_layer):

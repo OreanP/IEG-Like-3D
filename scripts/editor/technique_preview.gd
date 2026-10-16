@@ -3,6 +3,10 @@ extends SubViewportContainer
 ## Les gardiens ont un début partagé, puis deux fins après le temps des scores.
 
 const ModifierVisual = preload("res://scripts/presentation/modifier_visual.gd")
+const PlayerScene = preload("res://scenes/characters/player_view.tscn")
+const VisualTheme = preload("res://scripts/presentation/visual_theme.gd")
+var _skeleton: Skeleton3D
+var _rig_poses: Dictionary = {}
 var _modifier: Node3D
 var _camera: Camera3D
 var _world: Node3D
@@ -24,10 +28,11 @@ func _ready() -> void:
     stretch = true
     mouse_filter = Control.MOUSE_FILTER_IGNORE
     var viewport: SubViewport = SubViewport.new()
-    viewport.size = Vector2i(600, 270)
+    viewport.size = Vector2i(760, 380)
     viewport.own_world_3d = true
     viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-    viewport.msaa_3d = Viewport.MSAA_2X
+    viewport.msaa_3d = Viewport.MSAA_4X
+    viewport.positional_shadow_atlas_size = 2048
     add_child(viewport)
     var world: Node3D = Node3D.new()
     _world = world
@@ -35,50 +40,117 @@ func _ready() -> void:
     var environment_node: WorldEnvironment = WorldEnvironment.new()
     var environment: Environment = Environment.new()
     environment.background_mode = Environment.BG_COLOR
-    environment.background_color = Color("172740")
+    environment.background_color = Color("0a1423")
+    environment.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
+    var sky_material: ProceduralSkyMaterial = ProceduralSkyMaterial.new()
+    sky_material.sky_top_color = Color("102038")
+    sky_material.sky_horizon_color = Color("728b9e")
+    sky_material.ground_bottom_color = Color("102038")
+    sky_material.ground_horizon_color = Color("8c9faa")
+    sky_material.sky_curve = 0.15
+    sky_material.ground_curve = 0.15
+    var studio_sky: Sky = Sky.new()
+    studio_sky.sky_material = sky_material
+    studio_sky.radiance_size = Sky.RADIANCE_SIZE_256
+    environment.sky = studio_sky
     environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-    environment.ambient_light_color = Color("ccdfff")
-    environment.ambient_light_energy = 0.75
+    environment.ambient_light_color = Color("a6bdd7")
+    environment.ambient_light_energy = 0.38
+    environment.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+    environment.tonemap_exposure = 1.15
     environment_node.environment = environment
     world.add_child(environment_node)
     var camera: Camera3D = Camera3D.new()
     _camera = camera
-    camera.position = Vector3(4.5, 3.2, 6.0)
-    camera.fov = 43.0
+    camera.position = Vector3(4.3, 2.8, -6.2)
+    camera.fov = 39.0
     world.add_child(camera)
     camera.look_at(Vector3(0, 1.0, 0))
     var light: DirectionalLight3D = DirectionalLight3D.new()
-    light.rotation_degrees = Vector3(-48, -25, 0)
-    light.light_energy = 1.7
+    light.rotation_degrees = Vector3(-25, 150, 0)
+    light.light_color = Color("fff0d2")
+    light.light_energy = 1.8
+    light.shadow_enabled = true
+    light.directional_shadow_max_distance = 20
     world.add_child(light)
-    var ground: BoxMesh = BoxMesh.new()
-    ground.size = Vector3(12, 0.1, 12)
+    var softbox: DirectionalLight3D = DirectionalLight3D.new()
+    softbox.rotation_degrees = Vector3(-18, 65, 0)
+    softbox.light_color = Color("a1bfe8")
+    softbox.light_energy = 0.75
+    world.add_child(softbox)
+    var rim: OmniLight3D = OmniLight3D.new()
+    rim.position = Vector3(-3, 3.5, 2.0)
+    rim.light_color = Color("4bd9c3")
+    rim.light_energy = 3.5
+    rim.omni_range = 9
+    world.add_child(rim)
+    var fill: OmniLight3D = OmniLight3D.new()
+    fill.position = Vector3(3.5, 2.5, -3)
+    fill.light_color = Color("e5af65")
+    fill.light_energy = 1.4
+    fill.omni_range = 8
+    world.add_child(fill)
+    var ground: PlaneMesh = PlaneMesh.new()
+    ground.size = Vector2(50, 50)
     var ground_material: StandardMaterial3D = StandardMaterial3D.new()
-    ground_material.albedo_color = Color("243e49")
-    _mesh(world, ground, Vector3(0, -0.12, 0), ground_material)
+    ground_material.albedo_color = Color("0d1928")
+    ground_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+    ground_material.roughness = 0.75
+    _mesh(world, ground, Vector3(0, -0.14, 0), ground_material)
+    var dais_material: StandardMaterial3D = StandardMaterial3D.new()
+    dais_material.albedo_color = Color("1b3043")
+    dais_material.metallic = 0.5
+    dais_material.roughness = 0.35
+    var dais: CylinderMesh = CylinderMesh.new()
+    dais.top_radius = 3.3
+    dais.bottom_radius = 3.3
+    dais.height = 0.12
+    dais.radial_segments = 96
+    _mesh(world, dais, Vector3(0, -0.08, 0), dais_material)
+    var edge_material: StandardMaterial3D = StandardMaterial3D.new()
+    edge_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+    edge_material.albedo_color = Color("e5af65")
+    for radius: float in [3.2, 2.94]:
+        var edge: TorusMesh = TorusMesh.new()
+        edge.inner_radius = radius
+        edge.outer_radius = radius + 0.014
+        edge.rings = 96
+        edge.ring_segments = 6
+        _mesh(world, edge, Vector3(0, -0.008, 0), edge_material)
+    for index: int in range(32):
+        var angle: float = index * TAU / 32
+        var tick_mesh: BoxMesh = BoxMesh.new()
+        tick_mesh.size = Vector3(0.012, 0.006, 0.11 if index % 4 else 0.22)
+        var tick: MeshInstance3D = _mesh(world, tick_mesh, Vector3(sin(angle) * 3.07, -0.005, cos(angle) * 3.07), edge_material)
+        tick.rotation.y = angle
     _material = StandardMaterial3D.new()
     _material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
     _material.albedo_color = Color("a99aff")
     _material.emission_enabled = true
     _material.emission = _material.albedo_color
-    var kit: StandardMaterial3D = StandardMaterial3D.new()
-    kit.albedo_color = Color("317aca")
-    var skin: StandardMaterial3D = StandardMaterial3D.new()
-    skin.albedo_color = Color("ffd0a0")
-    _actor = Node3D.new()
+    _actor = PlayerScene.instantiate()
+    _actor.name = "PreviewFootballer"
     world.add_child(_actor)
-    _cylinder(_actor, Vector3(0, 1.04, 0), 0.29, 0.62, kit)
-    _sphere(_actor, Vector3(0, 1.62, 0), 0.22, skin)
+    _actor.selection_ring.visible = false
+    _actor.target_ring.visible = false
+    _actor.number_label.visible = false
+    _find_rig(_actor)
+    # Hidden controls drive bone poses, preserving the preview's animation contract.
     for side: int in [-1, 1]:
-        var arm: MeshInstance3D = _cylinder(_actor, Vector3(side * 0.43, 1.03, 0), 0.09, 0.65, skin)
+        var arm: MeshInstance3D = MeshInstance3D.new()
+        arm.position = Vector3(side * 0.43, 1.03, 0)
         arm.rotation.z = side * 0.25
+        _actor.add_child(arm)
         _arms.append(arm)
-        var leg: MeshInstance3D = _cylinder(_actor, Vector3(side * 0.16, 0.42, 0), 0.11, 0.78, kit)
+        var leg: MeshInstance3D = MeshInstance3D.new()
+        leg.position = Vector3(side * 0.16, 0.42, 0)
+        _actor.add_child(leg)
         _legs.append(leg)
     var ball_material: StandardMaterial3D = StandardMaterial3D.new()
-    ball_material.albedo_color = Color("f2f8ff")
+    ball_material.albedo_color = Color("f4f0df")
+    ball_material.roughness = 0.4
     ball_material.emission_enabled = true
-    ball_material.emission = Color("557799")
+    ball_material.emission = Color("172a3d")
     _ball = _sphere(world, Vector3(0, 0.2, 0.4), 0.17, ball_material)
     for index: int in range(7):
         var torus: TorusMesh = TorusMesh.new()
@@ -96,8 +168,10 @@ func _ready() -> void:
     var canvas: CanvasLayer = CanvasLayer.new()
     viewport.add_child(canvas)
     _label = Label.new()
-    _label.position = Vector2(10, 8)
-    _label.add_theme_font_size_override("font_size", 16)
+    _label.position = Vector2(16, 16)
+    _label.add_theme_font_override("font", VisualTheme.font())
+    _label.add_theme_color_override("font_color", Color("f4f0df"))
+    _label.add_theme_font_size_override("font_size", 13)
     _label.add_theme_color_override("font_shadow_color", Color.BLACK)
     _label.add_theme_constant_override("shadow_offset_x", 2)
     _label.add_theme_constant_override("shadow_offset_y", 2)
@@ -115,8 +189,8 @@ func set_definition(definition: Dictionary) -> void:
         _modifier.configure(_definition)
         _modifier.visible = str(_definition.get("category", "")) in ["KARMA", "RESONANCE"] or _modifier.style in ["astreion", "thalassa", "sovereign_orbit", "deep_watch"]
         _modifier.position = Vector3(0, 0, 0.7) if _modifier.style in ["astreion", "thalassa"] else Vector3.ZERO
-        _camera.position = Vector3(6.0, 3.6, -8.0) if _modifier.visible else Vector3(4.5, 3.2, 6.0)
-        _camera.look_at(Vector3(0, 1.7 if _modifier.visible else 1.0, 0))
+        _camera.position = Vector3(5.6, 3.5, -8.0) if _modifier.style in ["astreion", "thalassa"] else Vector3(4.3, 2.8, -6.2)
+        _camera.look_at(Vector3(0, 1.8 if _modifier.style in ["astreion", "thalassa"] else 1.0, 0))
     if _material != null:
         _material.albedo_color = Color(String(_definition.get("color", "#a99aff")))
         _material.emission = _material.albedo_color
@@ -143,8 +217,7 @@ func _process(delta: float) -> void:
     var release: float = clampf((t - branch) / (1.0 - branch), 0.0, 1.0)
     var effect: String = String(_definition.get("effect", "orbital"))
     var is_keeper: bool = String(_definition.get("category", "")) == "GAR"
-    _label.text = "%s  |  +%.0f  •  coût %.0f\n%s" % [_definition.get("name", ""), _definition.get("power", 0), _definition.get("cost", 0),
-        ("ÉCHEC — la garde cède" if _failure else "RÉUSSITE — ballon capturé") if is_keeper and t >= branch else ("Préparation partagée • résultat à 58 %" if is_keeper else "Animation de présentation • simulation indépendante")]
+    _label.text = ("ÉCHEC / la garde cède" if _failure else ("DÉVIATION / ballon libre" if _outcome == "deflection" else "CAPTURE / ballon maîtrisé")) if is_keeper and t >= branch else ("GAR / préparation commune" if is_keeper else "APERÇU 3D / animation de la technique")
     _actor.position = Vector3.ZERO
     _actor.rotation = Vector3.ZERO
     for index: int in range(_arms.size()):
@@ -164,6 +237,7 @@ func _process(delta: float) -> void:
     _ball.position = Vector3(0.25, 0.25, 0.5)
     if _modifier != null and _modifier.visible:
         _render_modifier_preview(t, branch, release, effect)
+        _apply_rig_pose()
         return
     match effect:
         "orbital":
@@ -237,6 +311,37 @@ func _process(delta: float) -> void:
         var radius: float = 1.05 + sin(t * PI) * 0.5
         _sparks[index].position = _actor.position + Vector3(cos(angle) * radius, 0.25 + float(index % 5) * 0.35, sin(angle) * radius)
         _sparks[index].scale = Vector3.ONE * (0.6 + sin(t * PI) * 0.8)
+    _apply_rig_pose()
+
+func _find_rig(node: Node) -> void:
+    if node is AnimationPlayer:
+        node.stop()
+    if node is Skeleton3D:
+        _skeleton = node
+        for index: int in range(_skeleton.get_bone_count()):
+            _rig_poses[index] = _skeleton.get_bone_pose_rotation(index)
+    for child: Node in node.get_children():
+        _find_rig(child)
+
+func _pose_bone(bone_name: String, angles: Vector3) -> void:
+    if _skeleton == null:
+        return
+    var index: int = _skeleton.find_bone(bone_name)
+    if index >= 0:
+        _skeleton.set_bone_pose_rotation(index, Quaternion.from_euler(angles))
+
+func _apply_rig_pose() -> void:
+    if _skeleton == null:
+        return
+    for index: int in _rig_poses:
+        _skeleton.set_bone_pose_rotation(index, _rig_poses[index])
+    _pose_bone("UpperArmL", Vector3(_arms[0].rotation.x, 0, _arms[0].rotation.z))
+    _pose_bone("UpperArmR", Vector3(_arms[1].rotation.x, 0, _arms[1].rotation.z))
+    _pose_bone("UpperLegL", _legs[0].rotation)
+    _pose_bone("UpperLegR", _legs[1].rotation)
+    _pose_bone("LowerArmL", Vector3(-0.25, 0, 0))
+    _pose_bone("LowerArmR", Vector3(-0.25, 0, 0))
+    _pose_bone("Chest", Vector3(-absf(_legs[1].rotation.x) * 0.12, 0, 0))
 
 func _mesh(parent: Node3D, mesh: Mesh, position: Vector3, material: Material) -> MeshInstance3D:
     var instance: MeshInstance3D = MeshInstance3D.new()
@@ -250,8 +355,8 @@ func _sphere(parent: Node3D, position: Vector3, radius: float, material: Materia
     var mesh: SphereMesh = SphereMesh.new()
     mesh.radius = radius
     mesh.height = radius * 2
-    mesh.radial_segments = 12
-    mesh.rings = 8
+    mesh.radial_segments = 24
+    mesh.rings = 16
     return _mesh(parent, mesh, position, material)
 
 func _cylinder(parent: Node3D, position: Vector3, radius: float, height: float, material: Material) -> MeshInstance3D:
@@ -273,13 +378,12 @@ func _render_modifier_preview(t: float, branch: float, release: float, effect: S
     _actor.rotation = Vector3.ZERO
     _ball.visible = effect in ["perihelion", "abyssal"]
     _modifier.set_presentation(_time)
-    var props: Dictionary = _definition.get("properties", {})
     if effect == "perihelion":
         _modifier.set_signature_progress(minf(1, t / branch), release, _outcome)
         _ball.position = Vector3(0, 0.4 + minf(t / branch, 1) * 1.3, -0.35 - release * 5)
         _legs[1].rotation.x = lerpf(-0.8, 1.2, smoothstep(0.2, branch, t)) * (1 - release)
         _arms[0].rotation.z = -0.8
-        _label.text = "%s • Signature d’Astreion\n%s PG / %s PE • préparation, frappe et météore" % [_definition.get("name", ""), props.get("pg_cost", 0), props.get("pe_cost", 0)]
+        _label.text = "SIGNATURE / préparation, frappe et météore"
     elif effect == "abyssal":
         _modifier.set_signature_progress(minf(1, t / branch), release, _outcome if t >= branch else "")
         _arms[0].rotation.z = -0.9 + release * 0.4
@@ -294,8 +398,8 @@ func _render_modifier_preview(t: float, branch: float, release: float, effect: S
             else:
                 _ball.position = Vector3(0, 1.1 - release * 0.1, -0.45 + release * 0.15)
         var ending: String = {"capture": "CAPTURE — voûte refermée", "deflection": "DÉVIATION — ballon libre", "goal": "ÉCHEC — voûte brisée"}.get(_outcome, "")
-        _label.text = "%s\n%s" % [_definition.get("name", ""), ending if t >= branch else "Préparation commune • scores puis résultat"]
+        _label.text = ending if t >= branch else "SIGNATURE / préparation commune"
     elif _modifier.style in ["astreion", "thalassa"]:
-        _label.text = "%s\nKarma • %s PG / %s PE • %s" % [_definition.get("name", ""), props.get("pg_max", props.get("pg", "?")), props.get("pe_max", props.get("pe", "?")), props.get("signature_id", "")]
+        _label.text = "KARMA / forme invoquée"
     else:
-        _label.text = "%s\nRésonance • marques du donneur, deux techniques et héritage" % _definition.get("name", "")
+        _label.text = "RÉSONANCE / marques du donneur"

@@ -2,6 +2,7 @@ extends Control
 ## Atelier autonome : edition de copies, validation puis sauvegarde locale atomique.
 const Catalog = preload("res://core/content/technique_catalog.gd")
 const Preview = preload("res://scripts/editor/technique_preview.gd")
+const VisualTheme = preload("res://scripts/presentation/visual_theme.gd")
 
 signal match_requested
 @export var embedded_mode: bool = false
@@ -22,9 +23,23 @@ var _mechanic_fields: Dictionary = {}
 var _mechanic_sections: Dictionary = {}
 var _mechanic_edits: Dictionary = {}
 var _stat_checks: Dictionary = {}
+var _visible_indices: Array[int] = []
+var _filter: OptionButton
+var _search: LineEdit
+var _entry_title: Label
+var _entry_badge: Label
+var _entry_summary: Label
+var _count_label: Label
+var _dirty_badge: Label
+var _original_scale_size: Vector2i
+const CATEGORY_LABELS: Dictionary = {"TIR": "Tirs", "ATT": "Dribbles", "DEF": "Défense", "GAR": "Gardiens", "TAC": "Tactiques", "KARMA": "Karma", "RESONANCE": "Résonances"}
 const STAT_LABELS: Dictionary = {"shot": "Tir", "dribble": "Dribble", "technique": "Technique", "defense": "Défense", "keeper": "Gardien"}
 
 func _ready() -> void:
+    if not embedded_mode:
+        _original_scale_size = get_window().content_scale_size
+        get_window().size_changed.connect(_fit_interface)
+        _fit_interface()
     catalog = Catalog.new(storage_path)
     _entries = catalog.all_definitions()
     _build_ui()
@@ -38,80 +53,159 @@ func _ready() -> void:
     else:
         _set_status("Contenus intégrés chargés. Modifiez une fiche, puis sauvegardez pour les prochains matchs.")
 
+func _fit_interface() -> void:
+    var window: Window = get_window()
+    var target := Vector2i(clampi(window.size.x, 960, 1280), clampi(window.size.y, 600, 800))
+    if window.content_scale_size != target:
+        window.content_scale_size = target
+
+func _exit_tree() -> void:
+    var window: Window = get_window()
+    if window != null and window.size_changed.is_connected(_fit_interface):
+        window.size_changed.disconnect(_fit_interface)
+        window.content_scale_size = _original_scale_size
+
 func _build_ui() -> void:
+    theme = VisualTheme.make_theme()
     var backdrop: ColorRect = ColorRect.new()
-    backdrop.color = Color("111b2d")
+    backdrop.color = Color("0b1523")
     backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
     add_child(backdrop)
     var margin: MarginContainer = MarginContainer.new()
     margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     for side: String in ["left", "right", "top", "bottom"]:
-        margin.add_theme_constant_override("margin_" + side, 18)
+        margin.add_theme_constant_override("margin_" + side, 20)
     add_child(margin)
     var layout: VBoxContainer = VBoxContainer.new()
-    layout.add_theme_constant_override("separation", 10)
+    layout.add_theme_constant_override("separation", 12)
     margin.add_child(layout)
+    var header: HBoxContainer = HBoxContainer.new()
+    header.add_theme_constant_override("separation", 16)
+    layout.add_child(header)
+    var wordmark: VBoxContainer = VBoxContainer.new()
+    wordmark.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    header.add_child(wordmark)
+    var eyebrow: Label = Label.new()
+    eyebrow.text = "IEG  /  LABORATOIRE DU CLUB"
+    eyebrow.add_theme_font_size_override("font_size", 12)
+    eyebrow.add_theme_color_override("font_color", Color("e5af65"))
+    wordmark.add_child(eyebrow)
     var title: Label = Label.new()
-    title.text = "ATELIER DU MATCH — Techniques, tactiques, Karma et Résonances"
-    title.add_theme_font_size_override("font_size", 24)
-    layout.add_child(title)
-    var help: Label = Label.new()
-    help.text = "Manette : croix / stick = navigation, A = valider, B = quitter un champ. Clavier : Tab, flèches, Entrée. Souris : clic. F5 : retour au match."
-    help.add_theme_font_size_override("font_size", 14)
-    layout.add_child(help)
+    title.text = "L’ATELIER"
+    title.add_theme_font_override("font", VisualTheme.display_font())
+    title.add_theme_font_size_override("font_size", 34)
+    wordmark.add_child(title)
+    _dirty_badge = Label.new()
+    _dirty_badge.text = "CATALOGUE LOCAL"
+    _dirty_badge.add_theme_font_size_override("font_size", 12)
+    _dirty_badge.add_theme_color_override("font_color", Color("9dafc3"))
+    header.add_child(_dirty_badge)
+    var return_button: Button = Button.new()
+    return_button.text = "Retour au match  ·  F5" if embedded_mode else "Jouer un match  ·  F5"
+    return_button.pressed.connect(_open_match)
+    header.add_child(return_button)
     var content: HBoxContainer = HBoxContainer.new()
     content.size_flags_vertical = Control.SIZE_EXPAND_FILL
-    content.add_theme_constant_override("separation", 18)
+    content.add_theme_constant_override("separation", 16)
     layout.add_child(content)
-    var sidebar: VBoxContainer = VBoxContainer.new()
-    sidebar.custom_minimum_size.x = 280
-    content.add_child(sidebar)
+    var sidebar: VBoxContainer = _card(content, "Catalogue", 14)
+    sidebar.get_parent().custom_minimum_size.x = 236
+    sidebar.get_parent().size_flags_horizontal = Control.SIZE_FILL
+    sidebar.add_theme_constant_override("separation", 10)
+    var library: Label = Label.new()
+    library.text = "COLLECTION"
+    library.add_theme_font_size_override("font_size", 12)
+    library.add_theme_color_override("font_color", Color("e5af65"))
+    sidebar.add_child(library)
+    _search = LineEdit.new()
+    _search.name = "Search"
+    _search.placeholder_text = "Rechercher une fiche…"
+    _search.clear_button_enabled = true
+    _search.text_changed.connect(func(_value: String) -> void: _filter_changed())
+    sidebar.add_child(_search)
+    _filter = OptionButton.new()
+    _filter.name = "CategoryFilter"
+    _filter.add_item("Toutes les catégories")
+    _filter.set_item_metadata(0, "")
+    for category: String in Catalog.CATEGORIES:
+        _filter.add_item(String(CATEGORY_LABELS.get(category, category)))
+        _filter.set_item_metadata(_filter.item_count - 1, category)
+    _filter.item_selected.connect(func(_index: int) -> void: _filter_changed())
+    sidebar.add_child(_filter)
     _list = ItemList.new()
     _list.name = "ContentList"
     _list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    _list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     _list.select_mode = ItemList.SELECT_SINGLE
+    _list.fixed_column_width = 194
+    _list.max_columns = 1
+    _list.auto_height = false
+    _list.add_theme_constant_override("v_separation", 12)
+    _list.add_theme_constant_override("line_separation", 6)
     _list.item_selected.connect(_select_entry)
     sidebar.add_child(_list)
-    _add_button(sidebar, "Dupliquer la fiche", _duplicate_entry)
-    _add_button(sidebar, "Retour au match (F5)" if embedded_mode else "Ouvrir le match (F5)", _open_match)
+    _count_label = Label.new()
+    _count_label.add_theme_font_size_override("font_size", 12)
+    _count_label.add_theme_color_override("font_color", Color("9dafc3"))
+    sidebar.add_child(_count_label)
+    _add_button(sidebar, "＋  Dupliquer la fiche", _duplicate_entry)
     var editor_scroll: ScrollContainer = ScrollContainer.new()
     editor_scroll.name = "EditorScroll"
     editor_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    editor_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
     editor_scroll.follow_focus = true
     content.add_child(editor_scroll)
     var editor: VBoxContainer = VBoxContainer.new()
     editor.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    editor.add_theme_constant_override("separation", 8)
+    editor.add_theme_constant_override("separation", 14)
     editor_scroll.add_child(editor)
-    var preview_row: HBoxContainer = HBoxContainer.new()
-    editor.add_child(preview_row)
+    var hero: VBoxContainer = _card(editor, "Presentation", 16)
+    var identity: HBoxContainer = HBoxContainer.new()
+    identity.add_theme_constant_override("separation", 12)
+    hero.add_child(identity)
+    _entry_title = Label.new()
+    _entry_title.text = "Sélectionnez une fiche"
+    _entry_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    _entry_title.add_theme_font_override("font", VisualTheme.display_font())
+    _entry_title.add_theme_font_size_override("font_size", 28)
+    _entry_title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+    _entry_title.clip_text = true
+    identity.add_child(_entry_title)
+    _entry_badge = Label.new()
+    _entry_badge.add_theme_font_size_override("font_size", 13)
+    _entry_badge.add_theme_color_override("font_color", Color("e5af65"))
+    identity.add_child(_entry_badge)
+    _entry_summary = Label.new()
+    _entry_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    _entry_summary.add_theme_font_size_override("font_size", 13)
+    _entry_summary.add_theme_color_override("font_color", Color("9dafc3"))
+    hero.add_child(_entry_summary)
     _preview = Preview.new()
-    _preview.custom_minimum_size = Vector2(440, 215)
+    _preview.name = "TechniquePreview"
+    _preview.custom_minimum_size = Vector2(240, 300)
     _preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    preview_row.add_child(_preview)
-    var preview_controls: VBoxContainer = VBoxContainer.new()
-    preview_row.add_child(preview_controls)
-    _add_button(preview_controls, "Rejouer", _replay_preview)
+    hero.add_child(_preview)
+    var preview_controls: HFlowContainer = HFlowContainer.new()
+    preview_controls.add_theme_constant_override("h_separation", 10)
+    hero.add_child(preview_controls)
+    _add_button(preview_controls, "↻  Rejouer", _replay_preview)
     var outcome: OptionButton = OptionButton.new()
     outcome.name = "KeeperOutcome"
-    for label: String in ["Gardien : capture", "Gardien : déviation", "Gardien : échec"]:
+    for label: String in ["Issue GAR : capture", "Issue GAR : déviation", "Issue GAR : échec"]:
         outcome.add_item(label)
     outcome.item_selected.connect(func(index: int) -> void:
-        if _preview.has_method("set_outcome"):
-            _preview.call("set_outcome", ["capture", "deflection", "goal"][index])
-        else:
-            _preview.set_failure(index == 2))
+        _preview.set_outcome(["capture", "deflection", "goal"][index]))
     preview_controls.add_child(outcome)
-    var note: Label = Label.new()
-    note.text = "Aperçu 3D procédural.\nLes issues GAR partagent\nla même préparation."
-    preview_controls.add_child(note)
+    var parameters: VBoxContainer = _card(editor, "Parameters", 16)
+    _section_heading(parameters, "01", "Identité & équilibre")
     var grid: GridContainer = GridContainer.new()
-    grid.columns = 4
-    grid.add_theme_constant_override("h_separation", 12)
-    grid.add_theme_constant_override("v_separation", 8)
-    editor.add_child(grid)
+    grid.columns = 2
+    grid.add_theme_constant_override("h_separation", 16)
+    grid.add_theme_constant_override("v_separation", 10)
+    parameters.add_child(grid)
     _add_text_field(grid, "Identifiant", "id", true)
-    _add_text_field(grid, "Nom", "name")
+    _add_text_field(grid, "Nom affiché", "name")
     _add_label(grid, "Catégorie")
     var category: OptionButton = OptionButton.new()
     category.name = "Category"
@@ -125,45 +219,60 @@ func _build_ui() -> void:
     grid.add_child(category)
     _add_text_field(grid, "Effet visuel", "effect")
     _add_number_field(grid, "Puissance", "power", 0.0, 500.0)
-    _add_number_field(grid, "Coût endurance", "cost", 0.0, 100.0)
-    _add_number_field(grid, "Durée (s)", "duration", 0.1, 600.0)
-    _add_number_field(grid, "Bonus portée (m)", "range_bonus", -25.0, 100.0)
+    _add_number_field(grid, "Coût en endurance", "cost", 0.0, 100.0)
+    _add_number_field(grid, "Durée (secondes)", "duration", 0.1, 600.0)
+    _add_number_field(grid, "Bonus de portée (m)", "range_bonus", -25.0, 100.0)
     _add_text_field(grid, "Couleur HTML", "color")
     var semantics: Label = Label.new()
-    semantics.text = "Durée = cinématique pour une technique ; durée en jeu pour TAC / Résonance. Karma : maintien limité par les PE. Cumul : un Karma et une Résonance par joueur ; trois de chaque par équipe."
+    semantics.text = "Techniques : durée de la cinématique. Tactiques et Résonances : durée en jeu. Karma : maintien limité par les PE."
     semantics.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    editor.add_child(semantics)
-    _add_label(editor, "Description")
+    semantics.add_theme_font_size_override("font_size", 13)
+    semantics.add_theme_color_override("font_color", Color("9dafc3"))
+    parameters.add_child(semantics)
+    _add_label(parameters, "Description")
     var description: TextEdit = TextEdit.new()
     description.name = "Description"
-    description.custom_minimum_size.y = 78
+    description.custom_minimum_size.y = 86
     description.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
     description.text_changed.connect(_mark_dirty)
     _fields["description"] = description
-    editor.add_child(description)
+    parameters.add_child(description)
     _build_mechanic_fields(editor)
+    var advanced: VBoxContainer = _card(editor, "Advanced", 16)
+    _section_heading(advanced, "03", "Propriétés avancées")
     var properties_help: Label = Label.new()
-    properties_help.text = "JSON avancé : les propriétés personnalisées sont conservées. Les champs dédiés modifiés priment sur le JSON jusqu'à validation. « Charger le JSON dans les champs » annule ces priorités et reprend le JSON saisi. La sauvegarde vérifie aussi les liens entre toutes les fiches."
+    properties_help.text = "Les propriétés personnalisées sont conservées. Les champs dédiés modifiés priment jusqu’à validation. Charger le JSON reprend les valeurs saisies ici."
     properties_help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    properties_help.add_theme_font_size_override("font_size", 14)
-    editor.add_child(properties_help)
+    properties_help.add_theme_font_size_override("font_size", 13)
+    properties_help.add_theme_color_override("font_color", Color("9dafc3"))
+    advanced.add_child(properties_help)
     var properties: TextEdit = TextEdit.new()
     properties.name = "Properties"
-    properties.custom_minimum_size.y = 160
+    properties.custom_minimum_size.y = 190
+    properties.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
+    properties.add_theme_font_size_override("font_size", 13)
     properties.text_changed.connect(_mark_dirty)
     _fields["properties"] = properties
-    editor.add_child(properties)
-    _add_button(editor, "Charger le JSON dans les champs", _sync_from_json)
-    var actions: HBoxContainer = HBoxContainer.new()
-    layout.add_child(actions)
-    _add_button(actions, "Valider / aperçu", _apply_preview)
-    _add_button(actions, "Sauvegarder", _save)
+    advanced.add_child(properties)
+    _add_button(advanced, "Charger le JSON dans les champs", _sync_from_json)
+    var footer: VBoxContainer = _card(layout, "Actions", 12)
+    var actions: HFlowContainer = HFlowContainer.new()
+    actions.add_theme_constant_override("h_separation", 10)
+    actions.add_theme_constant_override("v_separation", 6)
+    footer.add_child(actions)
+    var save_button: Button = Button.new()
+    save_button.text = "Sauvegarder le catalogue"
+    save_button.add_theme_color_override("font_color", Color("4bd9c3"))
+    save_button.pressed.connect(_save)
+    actions.add_child(save_button)
+    _add_button(actions, "Valider & actualiser l’aperçu", _apply_preview)
     _add_button(actions, "Recharger", _request_reload)
-    _add_button(actions, "Rétablir les valeurs intégrées", _request_restore)
+    _add_button(actions, "Valeurs d’origine", _request_restore)
     _status = Label.new()
-    _status.custom_minimum_size.y = 56
+    _status.custom_minimum_size.y = 32
     _status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    layout.add_child(_status)
+    _status.add_theme_font_size_override("font_size", 12)
+    footer.add_child(_status)
     _restore_dialog = ConfirmationDialog.new()
     _restore_dialog.title = "Rétablir tous les contenus intégrés ?"
     _restore_dialog.dialog_text = "Les modifications locales sauvegardées et non sauvegardées seront supprimées."
@@ -175,6 +284,31 @@ func _build_ui() -> void:
     _reload_dialog.confirmed.connect(_reload)
     add_child(_reload_dialog)
     _list.grab_focus()
+
+func _card(parent: Node, node_name: String, padding: int) -> VBoxContainer:
+    var panel: PanelContainer = PanelContainer.new()
+    panel.name = node_name
+    panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    var style: StyleBoxFlat = StyleBoxFlat.new()
+    style.bg_color = Color("132237")
+    style.border_color = Color("2b4057")
+    style.set_border_width_all(1)
+    style.set_corner_radius_all(12)
+    style.set_content_margin_all(padding)
+    panel.add_theme_stylebox_override("panel", style)
+    parent.add_child(panel)
+    var box: VBoxContainer = VBoxContainer.new()
+    box.add_theme_constant_override("separation", 10)
+    panel.add_child(box)
+    return box
+
+func _section_heading(parent: Node, number: String, title: String) -> void:
+    var label: Label = Label.new()
+    label.text = number + "  /  " + title
+    label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    label.add_theme_font_size_override("font_size", 17)
+    label.add_theme_color_override("font_color", Color("e5af65"))
+    parent.add_child(label)
 
 func _build_mechanic_fields(parent: Node) -> void:
     var karma: GridContainer = _mechanic_section(parent, "KARMA", "Karma — réserves et affrontements")
@@ -223,19 +357,14 @@ func _build_mechanic_fields(parent: Node) -> void:
     parent.add_child(rules)
 
 func _mechanic_section(parent: Node, key: String, title: String) -> GridContainer:
-    var section: VBoxContainer = VBoxContainer.new()
-    section.name = key.to_pascal_case() + "Section"
-    parent.add_child(section)
-    var heading: Label = Label.new()
-    heading.text = title
-    heading.add_theme_font_size_override("font_size", 18)
-    section.add_child(heading)
+    var section: VBoxContainer = _card(parent, key.to_pascal_case() + "Section", 16)
+    _section_heading(section, "02", title)
     var grid: GridContainer = GridContainer.new()
     grid.columns = 2
-    grid.add_theme_constant_override("h_separation", 10)
-    grid.add_theme_constant_override("v_separation", 7)
+    grid.add_theme_constant_override("h_separation", 16)
+    grid.add_theme_constant_override("v_separation", 10)
     section.add_child(grid)
-    _mechanic_sections[key] = section
+    _mechanic_sections[key] = section.get_parent()
     return grid
 
 func _add_property_number(parent: Node, title: String, path: String, minimum: float, maximum: float, increment: float = 0.1) -> void:
@@ -401,7 +530,10 @@ func _sync_from_json() -> void:
 func _add_label(parent: Node, title: String) -> void:
     var label: Label = Label.new()
     label.text = title
-    label.add_theme_font_size_override("font_size", 14)
+    label.add_theme_font_size_override("font_size", 13)
+    label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    label.custom_minimum_size.x = 150
+    label.add_theme_color_override("font_color", Color("b8c5d5"))
     parent.add_child(label)
 
 func _add_text_field(parent: Node, title: String, key: String, read_only: bool = false) -> void:
@@ -445,15 +577,56 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _rebuild_list() -> void:
     _list.clear()
-    for entry: Dictionary in _entries:
-        _list.add_item("[%s] %s" % [entry["category"], entry["name"]])
-        _list.set_item_tooltip(_list.item_count - 1, String(entry["description"]))
+    _visible_indices.clear()
+    var query: String = _search.text.strip_edges().to_lower() if _search != null else ""
+    var selected_category: String = str(_filter.get_item_metadata(_filter.selected)) if _filter != null else ""
+    for index: int in range(_entries.size()):
+        var entry: Dictionary = _entries[index]
+        if not selected_category.is_empty() and str(entry["category"]) != selected_category:
+            continue
+        if not query.is_empty() and not (str(entry["name"]) + " " + str(entry["id"])).to_lower().contains(query):
+            continue
+        _visible_indices.append(index)
+        _list.add_item(str(entry["name"]))
+        _list.set_item_tooltip(_list.item_count - 1, "[%s] %s\n%s" % [entry["category"], entry["name"], entry["description"]])
+        _list.set_item_custom_fg_color(_list.item_count - 1, Color("e5af65") if str(entry["category"]) == "KARMA" else (Color("4bd9c3") if str(entry["category"]) == "RESONANCE" else Color("f4f0df")))
+    if _count_label != null:
+        _count_label.text = "%d / %d fiches" % [_visible_indices.size(), _entries.size()]
+    var visible_index: int = _visible_indices.find(_selected)
+    if visible_index >= 0:
+        _list.select(visible_index)
+
+func _filter_changed() -> void:
+    if not _try_apply_edits():
+        return
+    _rebuild_list()
 
 func _select_entry(index: int) -> void:
-    if not _try_apply_edits():
-        _list.select(_selected)
+    if index < 0 or index >= _visible_indices.size():
         return
-    _show_entry(index)
+    var target: int = _visible_indices[index]
+    if not _try_apply_edits():
+        var previous: int = _visible_indices.find(_selected)
+        if previous >= 0:
+            _list.select(previous)
+        return
+    _show_entry(target)
+
+func _update_identity(entry: Dictionary) -> void:
+    _entry_title.text = str(entry["name"])
+    _entry_badge.text = str(entry["category"])
+    var props: Dictionary = entry.get("properties", {})
+    match str(entry["category"]):
+        "KARMA":
+            var signature: Dictionary = _find_definition(str(props.get("signature_id", "")))
+            _entry_summary.text = "%s PG  /  %s PE  •  %s" % [props.get("pg_max", "—"), props.get("pe_max", "—"), signature.get("name", "Technique exclusive")]
+        "RESONANCE":
+            var inherited: Array[String] = []
+            for id: Variant in props.get("inherited_techniques", []):
+                inherited.append(str(_find_definition(str(id)).get("name", id)))
+            _entry_summary.text = "%s  •  %s s  •  %s" % [props.get("donor_key", "Donneur"), entry.get("duration", 0), " + ".join(inherited)]
+        _:
+            _entry_summary.text = "Puissance %s  •  Endurance %s  •  %s" % [entry.get("power", 0), entry.get("cost", 0), "Technique exclusive" if props.has("karma_id") else "Technique de match"]
 
 func _show_entry(index: int) -> void:
     if index < 0 or index >= _entries.size():
@@ -470,7 +643,11 @@ func _show_entry(index: int) -> void:
     _mechanic_edits.clear()
     _load_mechanic_fields(entry["properties"])
     _loading = false
-    _list.select(index)
+    var visible_index: int = _visible_indices.find(index)
+    if visible_index >= 0:
+        _list.select(visible_index)
+        _list.ensure_current_is_visible()
+    _update_identity(entry)
     _preview.set_definition(entry)
 
 func _try_apply_edits() -> bool:
@@ -508,13 +685,16 @@ func _try_apply_edits() -> bool:
     _mechanic_edits.clear()
     _load_mechanic_fields(properties)
     _loading = false
-    _list.set_item_text(_selected, "[%s] %s" % [entry["category"], entry["name"]])
-    _list.set_item_tooltip(_selected, String(entry["description"]))
+    _rebuild_list()
+    _update_identity(entry)
     return true
 
 func _mark_dirty() -> void:
     if not _loading:
         _dirty = true
+        if _dirty_badge != null:
+            _dirty_badge.text = "●  NON SAUVEGARDÉ"
+            _dirty_badge.add_theme_color_override("font_color", Color("e5af65"))
         if _status != null:
             _set_status("Modifications non sauvegardées. Validez la fiche pour actualiser l'aperçu.")
 
@@ -645,4 +825,7 @@ func _open_match() -> void:
 
 func _set_status(message: String, is_error: bool = false) -> void:
     _status.text = message
+    if _dirty_badge != null:
+        _dirty_badge.text = "●  NON SAUVEGARDÉ" if _dirty else "✓  CATALOGUE À JOUR"
+        _dirty_badge.add_theme_color_override("font_color", VisualTheme.GOLD if _dirty else VisualTheme.AQUA)
     _status.add_theme_color_override("font_color", Color("ff9c9c") if is_error else Color("a9e1c2"))
