@@ -4,6 +4,8 @@ extends Node3D
 ## Seuls les modèles visuels sont mis en scène ; stop() rétablit leur état exact.
 
 const ModifierVisual = preload("res://scripts/presentation/modifier_visual.gd")
+const BallScene = preload("res://assets/ball/football.glb")
+const ENERGY_SHELL = preload("res://assets/vfx/energy_shell.gdshader")
 
 signal reveal
 signal finished
@@ -54,7 +56,11 @@ func begin(duel: Dictionary, attacker: Node3D, defender: Node3D, ball: Node3D) -
         _ball.visible = false
     _ghost_ball = _sphere(_stage, 0.17, Color("fff8dd"))
     _ghost_ball.name = "CinematicBall"
+    _use_football_mesh(_ghost_ball)
     _impact = _sphere(_stage, 0.28, Color("fff5b8"))
+    var impact_material := ShaderMaterial.new()
+    impact_material.shader = ENERGY_SHELL
+    _impact.material_override = impact_material
     _floor_ring = _ring(_stage, 0.8, Color("ffda89"))
     _floor_ring.position.y = 0.025
     _camera = Camera3D.new()
@@ -229,7 +235,7 @@ func _render() -> void:
     _ghost_ball.rotation = Vector3(13.0, 8.0, 3.0) * elapsed
     var burst: float = maxf(0.0, 1.0 - absf(elapsed - reveal_time) * 4.0)
     _impact.position = Vector3(0.0, 1.0, 1.9 if keeper else 0.0)
-    _impact.scale = Vector3.ONE * maxf(0.001, burst * 2.7)
+    _impact.scale = Vector3.ONE * maxf(0.001, burst * 1.9)
     _floor_ring.scale = Vector3.ONE * (1.0 + windup * 0.9 + aftermath * 3.0)
     _floor_ring.position.z = 0.0
     for effect: Dictionary in _fx:
@@ -539,6 +545,20 @@ func _sphere(parent: Node3D, radius: float, color: Color) -> MeshInstance3D:
     node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
     parent.add_child(node)
     return node
+
+func _use_football_mesh(target: MeshInstance3D) -> void:
+    # Même ballon détaillé que le jeu live, avec ses panneaux et son cuir.
+    var source: Node3D = BallScene.instantiate()
+    var mesh: MeshInstance3D = source as MeshInstance3D
+    if mesh == null:
+        var parts: Array[Node] = source.find_children("*", "MeshInstance3D", true, false)
+        if not parts.is_empty():
+            mesh = parts[0] as MeshInstance3D
+    if mesh != null:
+        target.mesh = mesh.mesh
+        target.material_override = null
+        target.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+    source.free()
 
 func _ring(parent: Node3D, radius: float, color: Color) -> MeshInstance3D:
     var node: MeshInstance3D = MeshInstance3D.new()
