@@ -20,6 +20,7 @@ func run_all() -> Dictionary:
         _catalog_rosters_are_complete, _catalog_references,
         _catalog_configures_formations_and_ai,
         _catalog_roster_isolation, _catalog_rejects_invalid_data,
+        _catalog_pending_chests_are_optional, _catalog_pending_contract,
         _fresh_progress, _victory_records_rank,
         _best_rank_never_regresses, _draw_and_loss_no_rank,
         _results_survive_reload, _replay_stays_accessible,
@@ -28,7 +29,8 @@ func run_all() -> Dictionary:
         _first_and_repeat_rewards, _unlock_requires_both_wins,
         _unlock_accepts_either_branch, _unlock_requires_higher_rank,
         _special_flag_persists, _reward_node_requires_claim,
-        _reward_node_unique_after_reload, _reward_rank_and_chance,
+        _reward_node_unique_after_reload, _pending_chest_preserves_state,
+        _pending_chest_can_be_configured_later, _reward_rank_and_chance,
         _experience_counts_each_player_once, _failed_write_rolls_back,
         _corrupted_save_not_overwritten, _bad_reload_keeps_valid_memory,
         _unknown_save_version_rejected, _external_save_change_not_overwritten,
@@ -197,7 +199,7 @@ func _document() -> Dictionary:
     var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(Catalog.DATA_PATH))
     return parsed if parsed is Dictionary else {}
 
-func _custom_catalog() -> RefCounted:
+func _custom_catalog(pending_ready: bool = false) -> RefCounted:
     var catalog: RefCounted = Catalog.new()
     var document: Dictionary = _document()
     if document.is_empty():
@@ -227,6 +229,9 @@ func _custom_catalog() -> RefCounted:
         "requires": [{"node": "first"}],
         "rewards": {"claim": [{"id": "recruit_fragment", "type": "recruitment", "amount": 2},
             {"id": "chest_currency", "type": "currency", "amount": 50}]}})
+    nodes.append({"id": "pending_chest", "name": "Coffre à définir", "type": "reward", "position": [100, 500],
+        "requires": [{"node": "first"}], "rewards_pending": not pending_ready,
+        "rewards": {"claim": [{"id": "configured_test_prize", "type": "item", "amount": 1}] if pending_ready else []}})
     document["routes"] = [{"id": "tests", "name": "Contrats de progression", "nodes": nodes, "edges": []}]
     if catalog.load_document(document) != OK:
         push_error("Fixture parcours invalide : " + str(catalog.last_errors))
@@ -247,6 +252,47 @@ func _catalog_rejects_invalid_data() -> bool:
     document = _document()
     document.routes[0].nodes[0]["requires"] = [{"node": "missing_node"}]
     return catalog.load_document(document) != OK and not catalog.last_errors.is_empty() and catalog.routes() == original
+
+func _catalog_pending_chests_are_optional() -> bool:
+    var catalog: RefCounted = Catalog.new()
+    var count: int = 0
+    for route: Dictionary in catalog.routes():
+        var pending: Dictionary = {}
+        for node: Dictionary in route.nodes:
+            if bool(node.get("rewards_pending", false)):
+                if node.type != "reward" or not node.get("rewards", {}).get("claim", []).is_empty():
+                    return false
+                pending[node.id] = true
+                count += 1
+        # Les coffres encore sans contenu restent des détours facultatifs.
+        for node: Dictionary in route.nodes:
+            for key: String in ["requires", "requires_any"]:
+                for condition: Dictionary in node.get(key, []):
+                    if pending.has(String(condition.get("node", ""))):
+                        return false
+    return count >= 3 and catalog.last_errors.is_empty()
+
+func _catalog_pending_contract() -> bool:
+    var catalog: RefCounted = Catalog.new()
+    var original: Array = catalog.routes()
+    var document: Dictionary = _document()
+    var pending: Dictionary = document.routes[0].nodes[-1]
+    if pending.get("type", "") != "reward" or not bool(pending.get("rewards_pending", false)):
+        return false
+    pending.rewards_pending = "true"
+    if catalog.load_document(document) == OK or catalog.routes() != original:
+        return false
+    pending.rewards_pending = true
+    pending.rewards.claim = [{"id": "test", "type": "currency", "amount": 1}]
+    if catalog.load_document(document) == OK or catalog.routes() != original:
+        return false
+    # Une fois le contenu configuré, désactiver le drapeau permet la réclame.
+    pending.rewards_pending = false
+    if catalog.load_document(document) != OK:
+        return false
+    var valid_routes: Array = catalog.routes()
+    document.routes[0].nodes[0]["rewards_pending"] = false
+    return catalog.load_document(document) != OK and catalog.routes() == valid_routes
 
 func _fresh_progress() -> bool:
     var p: RefCounted = _fixture("fresh")
@@ -414,6 +460,44 @@ func _reward_node_unique_after_reload() -> bool:
     var before: String = JSON.stringify(reloaded.state)
     var duplicate: Dictionary = reloaded.claim_node("tests", "chest")
     return duplicate.get("error", OK) == OK and duplicate.get("duplicate", false) and duplicate.get("rewards", []).is_empty() and JSON.stringify(reloaded.state) == before and int(reloaded.state.wallet.inventory.recruitment.recruit_fragment) == 2
+
+func _pending_chest_preserves_state() -> bool:
+    var path: String = _path("pending_chest")
+    var p: RefCounted = _custom_progress("unused", path)
+    if p.record_result("tests", "first", 1, 0, "unlock_pending").get("error", OK) != OK or not p.is_unlocked("tests", "pending_chest"):
+        return false
+    var before: String = JSON.stringify(p.state)
+    var before_file: String = FileAccess.get_file_as_string(path)
+    var before_rng: int = p.rng.state
+    var result: Dictionary = p.claim_node("tests", "pending_chest")
+    var reloaded: RefCounted = _custom_progress("unused", path)
+    return (result.get("error", OK) == ERR_UNAVAILABLE and not p.last_errors.is_empty()
+        and result.get("rewards", []).is_empty() and not result.get("duplicate", true)
+        and JSON.stringify(p.state) == before and p.rng.state == before_rng
+        and FileAccess.get_file_as_string(path) == before_file
+        and _same_json(reloaded.state, p.state) and reloaded.is_unlocked("tests", "pending_chest")
+        and not bool(reloaded.state.routes.tests.nodes.pending_chest.claimed))
+
+func _pending_chest_can_be_configured_later() -> bool:
+    var path: String = _path("configured_chest")
+    var pending: RefCounted = _custom_progress("unused", path)
+    if pending.record_result("tests", "first", 5, 0, "ready_later").get("error", OK) != OK or pending.claim_node("tests", "pending_chest").get("error", OK) != ERR_UNAVAILABLE:
+        return false
+    # Seules les données du catalogue changent : aucun effacement/migration de
+    # la sauvegarde, du rang ou des victoires n'est nécessaire.
+    var p: RefCounted = Progress.new(_custom_catalog(true), path)
+    if p.best_rank("tests", "first") != "S" or not p.is_unlocked("tests", "pending_chest"):
+        return false
+    var result: Dictionary = p.claim_node("tests", "pending_chest")
+    if result.get("error", OK) != OK or result.get("rewards", []).size() != 1:
+        return false
+    var reloaded: RefCounted = Progress.new(_custom_catalog(true), path)
+    var before: String = JSON.stringify(reloaded.state)
+    var duplicate: Dictionary = reloaded.claim_node("tests", "pending_chest")
+    return (reloaded.best_rank("tests", "first") == "S" and duplicate.get("error", OK) == OK
+        and duplicate.get("duplicate", false) and duplicate.get("rewards", []).is_empty()
+        and JSON.stringify(reloaded.state) == before
+        and int(reloaded.state.wallet.inventory.item.configured_test_prize) == 1)
 
 func _reward_rank_and_chance() -> bool:
     var p: RefCounted = _custom_progress("rank_rewards")

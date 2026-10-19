@@ -6,12 +6,22 @@
 
 Ajouter une entrée dans `routes`, avec `id`, `name`, `description`, `accent_color`, `nodes` et `edges`. Les identifiants sont stables, uniques dans leur espace et utilisent `a-z`, `0-9` et `_`. Les identifiants des joueurs sont uniques dans tout le catalogue.
 
-Chaque nœud possède `id`, `type`, `name`, `position: [x, y]`, `requires` et `rewards`. Les positions sont des pixels sur le tableau déroulant. Prévoir au moins 250 pixels entre deux cartes horizontalement et 170 verticalement.
+Chaque nœud possède `id`, `type`, `name`, `position: [x, y]`, `requires` et `rewards`. Les positions sont des pixels du monde de la carte, indépendantes du zoom de la caméra. Les cases mesurent 132 × 126 ; la démonstration utilise un espacement de 180 pixels horizontalement et 160 verticalement. Le tableau se centre sur la case choisie, sans modifier les coordonnées de contenu.
 
 - `match` : ajouter `team_id` et `recommended_level`.
 - `branch` : bifurcation accessible lorsque ses conditions sont remplies.
 - `gate` : condition de passage ; les nœuds suivants peuvent la référencer.
 - `reward` : coffre dont les récompenses sont dans `rewards.claim`.
+
+`presentation: "start"` sur une bifurcation affiche un départ vert. Une liaison décorative de départ n'ajoute pas de prérequis implicite aux matchs.
+
+Pour réserver un coffre dont le contenu sera décidé plus tard :
+
+```json
+{"id":"future_chest","type":"reward","name":"Coffre réservé","position":[180,0],"requires":[{"node":"meadow","rank":"B"}],"rewards_pending":true,"rewards":{"claim":[]}}
+```
+
+`rewards_pending` est un booléen réservé aux coffres ; un coffre en attente doit garder `claim` vide. La récupération est refusée avant toute mutation ou écriture. Pour définir le butin plus tard, retirer le drapeau ou le passer à `false` et remplir `rewards.claim`. Aucun changement d'identifiant ni migration de sauvegarde n'est nécessaire. Un coffre facultatif ne doit pas devenir un prérequis du chemin principal.
 
 `edges` est un tableau de paires `["départ", "arrivée"]` pour le dessin. **Les liaisons visuelles ne constituent pas des conditions d'accès** : les préciser dans `requires`.
 

@@ -145,6 +145,10 @@ func claim_node(route_id: String, node_id: String) -> Dictionary:
     var definition: Dictionary = catalog.node(route_id, node_id)
     if definition.is_empty() or str(definition.get("type", "")) != "reward":
         return _failure(outcome, ERR_INVALID_PARAMETER, "Ce nœud n'est pas une récompense.")
+    # Un coffre de décor peut attendre son contenu sans être consommé. Ce
+    # contrôle précède toute mutation ou écriture, même s'il est déjà accessible.
+    if bool(definition.get("rewards_pending", false)):
+        return _failure(outcome, ERR_UNAVAILABLE, "Le contenu de ce coffre reste à définir ; il pourra être ouvert une fois ses récompenses disponibles.")
     if not is_unlocked(route_id, node_id):
         return _failure(outcome, ERR_UNAUTHORIZED, "Cette récompense n'est pas encore accessible.")
     var node_state: Dictionary = _ensure_node(route_id, node_id)

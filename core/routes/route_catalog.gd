@@ -235,6 +235,13 @@ func _validate_route(data: Dictionary, team_ids: Dictionary, errors: PackedStrin
         if str(raw.get("type", "")) == "match":
             if not team_ids.has(str(raw.get("team_id", ""))) or not _integer(raw.get("recommended_level"), 1, 99):
                 errors.append(prefix + "équipe ou niveau du match invalide : " + id)
+        if raw.has("rewards_pending"):
+            if not raw["rewards_pending"] is bool or str(raw.get("type", "")) != "reward":
+                errors.append(prefix + "rewards_pending doit être un booléen réservé aux coffres : " + id)
+            elif raw["rewards_pending"] and raw.get("rewards", {}) is Dictionary:
+                var claim: Variant = raw.get("rewards", {}).get("claim", [])
+                if claim is Array and not claim.is_empty():
+                    errors.append(prefix + "un coffre en attente ne peut pas avoir de récompenses claim : " + id)
         _validate_rewards(raw.get("rewards", {}), prefix + id + " : ", errors)
     for id: String in nodes:
         var selected: Dictionary = nodes[id]

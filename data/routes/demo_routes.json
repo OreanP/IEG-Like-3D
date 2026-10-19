@@ -1533,14 +1533,27 @@
       "accent_color": "#e5af65",
       "nodes": [
         {
+          "id": "equinox_start",
+          "type": "branch",
+          "presentation": "start",
+          "name": "Départ",
+          "description": "Choisissez une case pour explorer le parcours des Équinoxes.",
+          "position": [
+            0,
+            160
+          ],
+          "requires": [],
+          "rewards": {}
+        },
+        {
           "id": "meadow",
           "type": "match",
           "name": "Brise des Prés",
           "team_id": "prairie_breeze",
           "recommended_level": 6,
           "position": [
-            40,
-            220
+            180,
+            160
           ],
           "requires": [],
           "rewards": {
@@ -1604,8 +1617,8 @@
           "name": "Deux horizons",
           "description": "Choisissez librement la branche du port ou celle de la forge.",
           "position": [
-            290,
-            220
+            360,
+            160
           ],
           "requires": [
             {
@@ -1623,7 +1636,7 @@
           "recommended_level": 9,
           "position": [
             540,
-            80
+            0
           ],
           "requires": [
             {
@@ -1694,7 +1707,7 @@
           "recommended_level": 12,
           "position": [
             540,
-            370
+            320
           ],
           "requires": [
             {
@@ -1764,8 +1777,8 @@
           "team_id": "quartz_mirage",
           "recommended_level": 15,
           "position": [
-            790,
-            80
+            720,
+            0
           ],
           "requires": [
             {
@@ -1835,8 +1848,8 @@
           "team_id": "midnight_watch",
           "recommended_level": 18,
           "position": [
-            790,
-            370
+            720,
+            320
           ],
           "requires": [
             {
@@ -1905,8 +1918,8 @@
           "name": "Porte du mérite",
           "description": "Remportez les deux branches. Un rang A sur Mirage ou Minuit ouvre la finale.",
           "position": [
-            1040,
-            220
+            900,
+            160
           ],
           "requires": [
             {
@@ -1937,8 +1950,8 @@
           "team_id": "royal_eclipse",
           "recommended_level": 22,
           "position": [
-            1290,
-            220
+            1080,
+            160
           ],
           "requires": [
             {
@@ -2006,8 +2019,8 @@
           "name": "Coffre des Équinoxes",
           "description": "Une récompense unique pour la victoire en finale.",
           "position": [
-            1540,
-            220
+            1440,
+            160
           ],
           "requires": [
             {
@@ -2043,9 +2056,53 @@
               }
             ]
           }
+        },
+        {
+          "id": "meadow_cache",
+          "type": "reward",
+          "name": "Coffre des Prés",
+          "description": "Un coffre facultatif dont les récompenses seront définies plus tard.",
+          "position": [
+            180,
+            0
+          ],
+          "requires": [
+            {
+              "node": "meadow",
+              "rank": "B"
+            }
+          ],
+          "rewards_pending": true,
+          "rewards": {
+            "claim": []
+          }
+        },
+        {
+          "id": "eclipse_cache",
+          "type": "reward",
+          "name": "Coffre de l’Éclipse",
+          "description": "Un coffre facultatif dont les récompenses seront définies plus tard.",
+          "position": [
+            1260,
+            320
+          ],
+          "requires": [
+            {
+              "node": "eclipse",
+              "rank": "B"
+            }
+          ],
+          "rewards_pending": true,
+          "rewards": {
+            "claim": []
+          }
         }
       ],
       "edges": [
+        [
+          "equinox_start",
+          "meadow"
+        ],
         [
           "meadow",
           "crossroads"
@@ -2081,6 +2138,14 @@
         [
           "eclipse",
           "victory_chest"
+        ],
+        [
+          "meadow",
+          "meadow_cache"
+        ],
+        [
+          "eclipse",
+          "eclipse_cache"
         ]
       ]
     },
@@ -2091,14 +2156,27 @@
       "accent_color": "#4bd9c3",
       "nodes": [
         {
+          "id": "littoral_start",
+          "type": "branch",
+          "presentation": "start",
+          "name": "Départ",
+          "description": "Explorez les défis du Littoral.",
+          "position": [
+            0,
+            160
+          ],
+          "requires": [],
+          "rewards": {}
+        },
+        {
           "id": "coast_start",
           "type": "match",
           "name": "Brise des Prés",
           "team_id": "prairie_breeze",
           "recommended_level": 6,
           "position": [
-            60,
-            170
+            180,
+            160
           ],
           "requires": [],
           "rewards": {
@@ -2163,8 +2241,8 @@
           "team_id": "amber_sailors",
           "recommended_level": 9,
           "position": [
-            330,
-            170
+            360,
+            0
           ],
           "requires": [
             {
@@ -2234,8 +2312,8 @@
           "team_id": "quartz_mirage",
           "recommended_level": 15,
           "position": [
-            600,
-            170
+            540,
+            0
           ],
           "requires": [
             {
@@ -2297,9 +2375,33 @@
               }
             ]
           }
+        },
+        {
+          "id": "coast_cache",
+          "type": "reward",
+          "name": "Coffre du Littoral",
+          "description": "Un coffre facultatif dont les récompenses seront définies plus tard.",
+          "position": [
+            360,
+            320
+          ],
+          "requires": [
+            {
+              "node": "coast_start",
+              "rank": "B"
+            }
+          ],
+          "rewards_pending": true,
+          "rewards": {
+            "claim": []
+          }
         }
       ],
       "edges": [
+        [
+          "littoral_start",
+          "coast_start"
+        ],
         [
           "coast_start",
           "coast_amber"
@@ -2307,6 +2409,10 @@
         [
           "coast_amber",
           "coast_quartz"
+        ],
+        [
+          "coast_start",
+          "coast_cache"
         ]
       ]
     }
