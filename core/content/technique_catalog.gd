@@ -4,6 +4,7 @@ extends RefCounted
 ## Les modifications locales sont sérialisées dans user://, jamais dans les assets.
 
 const STORAGE_PATH: String = "user://match_content.json"
+const JsonStore = preload("res://core/persistence/json_store.gd")
 const SCHEMA_VERSION: int = 3
 const STAT_KEYS: PackedStringArray = ["shot", "dribble", "technique", "keeper", "defense"]
 const MAX_KARMA_OWNERS: int = 32
@@ -136,24 +137,9 @@ func save_overrides(entries: Array[Dictionary]) -> Error:
     if document.to_utf8_buffer().size() > 524288:
         last_errors.append("La sauvegarde dépasserait 512 Kio ; réduisez les propriétés ou le nombre de contenus.")
         return ERR_INVALID_DATA
-    var temporary: String = _storage_path + ".tmp"
-    var file: FileAccess = FileAccess.open(temporary, FileAccess.WRITE)
-    if file == null:
-        last_errors.append("Impossible de créer le fichier local : " + error_string(FileAccess.get_open_error()))
-        return FileAccess.get_open_error()
-    file.store_string(document)
-    file.flush()
-    var write_error: Error = file.get_error()
-    file.close()
+    var write_error: Error = JsonStore.write_document(_storage_path, document, last_errors)
     if write_error != OK:
-        last_errors.append("Impossible d'écrire les contenus : " + error_string(write_error))
-        DirAccess.remove_absolute(ProjectSettings.globalize_path(temporary))
         return write_error
-    var rename_error: Error = DirAccess.rename_absolute(ProjectSettings.globalize_path(temporary), ProjectSettings.globalize_path(_storage_path))
-    if rename_error != OK:
-        last_errors.append("Impossible de remplacer la sauvegarde : " + error_string(rename_error))
-        DirAccess.remove_absolute(ProjectSettings.globalize_path(temporary))
-        return rename_error
     _overrides = checked
     return OK
 

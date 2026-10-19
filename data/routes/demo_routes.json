@@ -1,0 +1,2314 @@
+{
+  "version": 1,
+  "rank_rules": {
+    "a_goal_difference": 3,
+    "s_goals_for": 5,
+    "s_goals_against": 0
+  },
+  "teams": [
+    {
+      "id": "prairie_breeze",
+      "name": "Brise des Prés",
+      "description": "Une équipe de quartier patiente, idéale pour prendre ses repères.",
+      "emblem": "res://assets/ui/routes/prairie_breeze.svg",
+      "kit_color": "#55ad6b",
+      "accent_color": "#d2efd4",
+      "keeper_color": "#eca548",
+      "recommended_level": 6,
+      "formation": "balanced",
+      "ai": {
+        "pressure": 0.12,
+        "shoot_distance": 18,
+        "shot_charge": 0.5,
+        "sprint_distance": 10
+      },
+      "half_seconds": 300,
+      "players": [
+        {
+          "id": "prairie_breeze_01",
+          "name": "Noé Sylve",
+          "shirt_number": 1,
+          "role": "GAR",
+          "stats": {
+            "shot": 22,
+            "dribble": 30,
+            "technique": 42,
+            "defense": 43,
+            "keeper": 51
+          },
+          "techniques": [
+            "photo_stop"
+          ],
+          "karmas": [],
+          "run_speed": 4.85,
+          "sprint_speed": 7.6,
+          "skin_color": "#bd805e",
+          "hair_color": "#221d27"
+        },
+        {
+          "id": "prairie_breeze_02",
+          "name": "Lina Orme",
+          "shirt_number": 2,
+          "role": "DEF",
+          "stats": {
+            "shot": 36,
+            "dribble": 38,
+            "technique": 35,
+            "defense": 46,
+            "keeper": 22
+          },
+          "techniques": [
+            "hurricane_barrier"
+          ],
+          "karmas": [],
+          "run_speed": 4.95,
+          "sprint_speed": 7.72,
+          "skin_color": "#edc09d",
+          "hair_color": "#2e2929"
+        },
+        {
+          "id": "prairie_breeze_03",
+          "name": "Bastien Rive",
+          "shirt_number": 3,
+          "role": "DEF",
+          "stats": {
+            "shot": 39,
+            "dribble": 43,
+            "technique": 37,
+            "defense": 50,
+            "keeper": 22
+          },
+          "techniques": [
+            "hurricane_barrier"
+          ],
+          "karmas": [],
+          "run_speed": 5.05,
+          "sprint_speed": 7.84,
+          "skin_color": "#86583e",
+          "hair_color": "#201a18"
+        },
+        {
+          "id": "prairie_breeze_04",
+          "name": "Anika Morel",
+          "shirt_number": 4,
+          "role": "DEF",
+          "stats": {
+            "shot": 33,
+            "dribble": 37,
+            "technique": 39,
+            "defense": 45,
+            "keeper": 22
+          },
+          "techniques": [
+            "hurricane_barrier"
+          ],
+          "karmas": [],
+          "run_speed": 4.85,
+          "sprint_speed": 7.6,
+          "skin_color": "#b47c58",
+          "hair_color": "#221d27"
+        },
+        {
+          "id": "prairie_breeze_05",
+          "name": "Hugo Saule",
+          "shirt_number": 5,
+          "role": "DEF",
+          "stats": {
+            "shot": 36,
+            "dribble": 42,
+            "technique": 41,
+            "defense": 49,
+            "keeper": 22
+          },
+          "techniques": [
+            "hurricane_barrier"
+          ],
+          "karmas": [],
+          "run_speed": 4.95,
+          "sprint_speed": 7.72,
+          "skin_color": "#d4a082",
+          "hair_color": "#2e2929"
+        },
+        {
+          "id": "prairie_breeze_06",
+          "name": "Mina Follet",
+          "shirt_number": 6,
+          "role": "MIL",
+          "stats": {
+            "shot": 39,
+            "dribble": 44,
+            "technique": 40,
+            "defense": 35,
+            "keeper": 22
+          },
+          "techniques": [
+            "drift"
+          ],
+          "karmas": [],
+          "run_speed": 5.05,
+          "sprint_speed": 7.84,
+          "skin_color": "#704b38",
+          "hair_color": "#201a18"
+        },
+        {
+          "id": "prairie_breeze_07",
+          "name": "Élio Prairie",
+          "shirt_number": 7,
+          "role": "MIL",
+          "stats": {
+            "shot": 33,
+            "dribble": 49,
+            "technique": 42,
+            "defense": 39,
+            "keeper": 22
+          },
+          "techniques": [
+            "drift"
+          ],
+          "karmas": [],
+          "run_speed": 4.85,
+          "sprint_speed": 7.6,
+          "skin_color": "#bd805e",
+          "hair_color": "#221d27"
+        },
+        {
+          "id": "prairie_breeze_08",
+          "name": "Jade Garnier",
+          "shirt_number": 8,
+          "role": "MIL",
+          "stats": {
+            "shot": 36,
+            "dribble": 43,
+            "technique": 44,
+            "defense": 34,
+            "keeper": 22
+          },
+          "techniques": [
+            "drift"
+          ],
+          "karmas": [],
+          "run_speed": 4.95,
+          "sprint_speed": 7.72,
+          "skin_color": "#edc09d",
+          "hair_color": "#2e2929"
+        },
+        {
+          "id": "prairie_breeze_09",
+          "name": "Tao Vernet",
+          "shirt_number": 9,
+          "role": "MIL",
+          "stats": {
+            "shot": 39,
+            "dribble": 48,
+            "technique": 46,
+            "defense": 38,
+            "keeper": 22
+          },
+          "techniques": [
+            "drift"
+          ],
+          "karmas": [],
+          "run_speed": 5.05,
+          "sprint_speed": 7.84,
+          "skin_color": "#86583e",
+          "hair_color": "#201a18"
+        },
+        {
+          "id": "prairie_breeze_10",
+          "name": "Clara Brin",
+          "shirt_number": 10,
+          "role": "ATT",
+          "stats": {
+            "shot": 46,
+            "dribble": 34,
+            "technique": 41,
+            "defense": 33,
+            "keeper": 22
+          },
+          "techniques": [
+            "orbital_shot"
+          ],
+          "karmas": [],
+          "run_speed": 4.85,
+          "sprint_speed": 7.6,
+          "skin_color": "#b47c58",
+          "hair_color": "#221d27"
+        },
+        {
+          "id": "prairie_breeze_11",
+          "name": "Nils Perret",
+          "shirt_number": 11,
+          "role": "ATT",
+          "stats": {
+            "shot": 49,
+            "dribble": 39,
+            "technique": 33,
+            "defense": 37,
+            "keeper": 22
+          },
+          "techniques": [
+            "orbital_shot"
+          ],
+          "karmas": [],
+          "run_speed": 4.95,
+          "sprint_speed": 7.72,
+          "skin_color": "#d4a082",
+          "hair_color": "#2e2929"
+        }
+      ]
+    },
+    {
+      "id": "amber_sailors",
+      "name": "Marins d’Ambre",
+      "description": "Des couloirs très larges et des frappes à distance.",
+      "emblem": "res://assets/ui/routes/amber_sailors.svg",
+      "kit_color": "#ecad49",
+      "accent_color": "#fff0bb",
+      "keeper_color": "#377fa2",
+      "recommended_level": 9,
+      "formation": "wide",
+      "ai": {
+        "pressure": 0.25,
+        "shoot_distance": 22,
+        "shot_charge": 0.56,
+        "sprint_distance": 9
+      },
+      "half_seconds": 300,
+      "players": [
+        {
+          "id": "amber_sailors_01",
+          "name": "Salomé Dune",
+          "shirt_number": 1,
+          "role": "GAR",
+          "stats": {
+            "shot": 24,
+            "dribble": 33,
+            "technique": 47,
+            "defense": 47,
+            "keeper": 57
+          },
+          "techniques": [
+            "gyroscopic_stop"
+          ],
+          "karmas": [],
+          "run_speed": 4.95,
+          "sprint_speed": 7.73,
+          "skin_color": "#edc09d",
+          "hair_color": "#6d482d"
+        },
+        {
+          "id": "amber_sailors_02",
+          "name": "Isaac Mistral",
+          "shirt_number": 2,
+          "role": "DEF",
+          "stats": {
+            "shot": 42,
+            "dribble": 44,
+            "technique": 41,
+            "defense": 52,
+            "keeper": 26
+          },
+          "techniques": [
+            "aquablast"
+          ],
+          "karmas": [],
+          "run_speed": 5.05,
+          "sprint_speed": 7.85,
+          "skin_color": "#86583e",
+          "hair_color": "#a97545"
+        },
+        {
+          "id": "amber_sailors_03",
+          "name": "Nora Ancre",
+          "shirt_number": 3,
+          "role": "DEF",
+          "stats": {
+            "shot": 45,
+            "dribble": 49,
+            "technique": 43,
+            "defense": 56,
+            "keeper": 26
+          },
+          "techniques": [
+            "aquablast"
+          ],
+          "karmas": [],
+          "run_speed": 5.15,
+          "sprint_speed": 7.97,
+          "skin_color": "#b47c58",
+          "hair_color": "#3a2633"
+        },
+        {
+          "id": "amber_sailors_04",
+          "name": "Malo Pennec",
+          "shirt_number": 4,
+          "role": "DEF",
+          "stats": {
+            "shot": 39,
+            "dribble": 43,
+            "technique": 45,
+            "defense": 51,
+            "keeper": 26
+          },
+          "techniques": [
+            "aquablast"
+          ],
+          "karmas": [],
+          "run_speed": 4.95,
+          "sprint_speed": 7.73,
+          "skin_color": "#d4a082",
+          "hair_color": "#6d482d"
+        },
+        {
+          "id": "amber_sailors_05",
+          "name": "Sacha Varech",
+          "shirt_number": 5,
+          "role": "DEF",
+          "stats": {
+            "shot": 42,
+            "dribble": 48,
+            "technique": 47,
+            "defense": 55,
+            "keeper": 26
+          },
+          "techniques": [
+            "aquablast"
+          ],
+          "karmas": [],
+          "run_speed": 5.05,
+          "sprint_speed": 7.85,
+          "skin_color": "#704b38",
+          "hair_color": "#a97545"
+        },
+        {
+          "id": "amber_sailors_06",
+          "name": "Yuna Sel",
+          "shirt_number": 6,
+          "role": "MIL",
+          "stats": {
+            "shot": 45,
+            "dribble": 50,
+            "technique": 46,
+            "defense": 41,
+            "keeper": 26
+          },
+          "techniques": [
+            "drift"
+          ],
+          "karmas": [],
+          "run_speed": 5.15,
+          "sprint_speed": 7.97,
+          "skin_color": "#bd805e",
+          "hair_color": "#3a2633"
+        },
+        {
+          "id": "amber_sailors_07",
+          "name": "Adrien Houle",
+          "shirt_number": 7,
+          "role": "MIL",
+          "stats": {
+            "shot": 39,
+            "dribble": 55,
+            "technique": 48,
+            "defense": 45,
+            "keeper": 26
+          },
+          "techniques": [
+            "drift"
+          ],
+          "karmas": [],
+          "run_speed": 4.95,
+          "sprint_speed": 7.73,
+          "skin_color": "#edc09d",
+          "hair_color": "#6d482d"
+        },
+        {
+          "id": "amber_sailors_08",
+          "name": "Léonie Azur",
+          "shirt_number": 8,
+          "role": "MIL",
+          "stats": {
+            "shot": 42,
+            "dribble": 49,
+            "technique": 50,
+            "defense": 40,
+            "keeper": 26
+          },
+          "techniques": [
+            "drift"
+          ],
+          "karmas": [],
+          "run_speed": 5.05,
+          "sprint_speed": 7.85,
+          "skin_color": "#86583e",
+          "hair_color": "#a97545"
+        },
+        {
+          "id": "amber_sailors_09",
+          "name": "Eden Galet",
+          "shirt_number": 9,
+          "role": "MIL",
+          "stats": {
+            "shot": 45,
+            "dribble": 54,
+            "technique": 52,
+            "defense": 44,
+            "keeper": 26
+          },
+          "techniques": [
+            "drift"
+          ],
+          "karmas": [],
+          "run_speed": 5.15,
+          "sprint_speed": 7.97,
+          "skin_color": "#b47c58",
+          "hair_color": "#3a2633"
+        },
+        {
+          "id": "amber_sailors_10",
+          "name": "Sofia Sillage",
+          "shirt_number": 10,
+          "role": "ATT",
+          "stats": {
+            "shot": 52,
+            "dribble": 40,
+            "technique": 47,
+            "defense": 39,
+            "keeper": 26
+          },
+          "techniques": [
+            "magnus_shot"
+          ],
+          "karmas": [],
+          "run_speed": 4.95,
+          "sprint_speed": 7.73,
+          "skin_color": "#d4a082",
+          "hair_color": "#6d482d"
+        },
+        {
+          "id": "amber_sailors_11",
+          "name": "Jules Marin",
+          "shirt_number": 11,
+          "role": "ATT",
+          "stats": {
+            "shot": 55,
+            "dribble": 45,
+            "technique": 39,
+            "defense": 43,
+            "keeper": 26
+          },
+          "techniques": [
+            "magnus_shot"
+          ],
+          "karmas": [],
+          "run_speed": 5.05,
+          "sprint_speed": 7.85,
+          "skin_color": "#704b38",
+          "hair_color": "#a97545"
+        }
+      ]
+    },
+    {
+      "id": "scarlet_forge",
+      "name": "Forge Écarlate",
+      "description": "Un bloc haut qui cherche le contact et protège son axe.",
+      "emblem": "res://assets/ui/routes/scarlet_forge.svg",
+      "kit_color": "#cc4658",
+      "accent_color": "#ffd5b6",
+      "keeper_color": "#4ea9ab",
+      "recommended_level": 12,
+      "formation": "press",
+      "ai": {
+        "pressure": 0.48,
+        "shoot_distance": 19,
+        "shot_charge": 0.62,
+        "sprint_distance": 7
+      },
+      "half_seconds": 300,
+      "players": [
+        {
+          "id": "scarlet_forge_01",
+          "name": "Léon Ferris",
+          "shirt_number": 1,
+          "role": "GAR",
+          "stats": {
+            "shot": 26,
+            "dribble": 36,
+            "technique": 52,
+            "defense": 51,
+            "keeper": 63
+          },
+          "techniques": [
+            "photo_stop"
+          ],
+          "karmas": [],
+          "run_speed": 5.05,
+          "sprint_speed": 7.86,
+          "skin_color": "#86583e",
+          "hair_color": "#2e2929"
+        },
+        {
+          "id": "scarlet_forge_02",
+          "name": "Inès Rivet",
+          "shirt_number": 2,
+          "role": "DEF",
+          "stats": {
+            "shot": 48,
+            "dribble": 50,
+            "technique": 47,
+            "defense": 58,
+            "keeper": 30
+          },
+          "techniques": [
+            "hurricane_barrier"
+          ],
+          "karmas": [],
+          "run_speed": 5.15,
+          "sprint_speed": 7.98,
+          "skin_color": "#b47c58",
+          "hair_color": "#201a18"
+        },
+        {
+          "id": "scarlet_forge_03",
+          "name": "Ruben Braise",
+          "shirt_number": 3,
+          "role": "DEF",
+          "stats": {
+            "shot": 51,
+            "dribble": 55,
+            "technique": 49,
+            "defense": 62,
+            "keeper": 30
+          },
+          "techniques": [
+            "hurricane_barrier"
+          ],
+          "karmas": [],
+          "run_speed": 5.25,
+          "sprint_speed": 8.1,
+          "skin_color": "#d4a082",
+          "hair_color": "#221d27"
+        },
+        {
+          "id": "scarlet_forge_04",
+          "name": "Alma Forgeron",
+          "shirt_number": 4,
+          "role": "DEF",
+          "stats": {
+            "shot": 45,
+            "dribble": 49,
+            "technique": 51,
+            "defense": 57,
+            "keeper": 30
+          },
+          "techniques": [
+            "hurricane_barrier"
+          ],
+          "karmas": [],
+          "run_speed": 5.05,
+          "sprint_speed": 7.86,
+          "skin_color": "#704b38",
+          "hair_color": "#2e2929"
+        },
+        {
+          "id": "scarlet_forge_05",
+          "name": "Enzo Acier",
+          "shirt_number": 5,
+          "role": "DEF",
+          "stats": {
+            "shot": 48,
+            "dribble": 54,
+            "technique": 53,
+            "defense": 61,
+            "keeper": 30
+          },
+          "techniques": [
+            "hurricane_barrier"
+          ],
+          "karmas": [],
+          "run_speed": 5.15,
+          "sprint_speed": 7.98,
+          "skin_color": "#bd805e",
+          "hair_color": "#201a18"
+        },
+        {
+          "id": "scarlet_forge_06",
+          "name": "Naïma Cendre",
+          "shirt_number": 6,
+          "role": "MIL",
+          "stats": {
+            "shot": 51,
+            "dribble": 56,
+            "technique": 52,
+            "defense": 47,
+            "keeper": 30
+          },
+          "techniques": [
+            "drift"
+          ],
+          "karmas": [],
+          "run_speed": 5.25,
+          "sprint_speed": 8.1,
+          "skin_color": "#edc09d",
+          "hair_color": "#221d27"
+        },
+        {
+          "id": "scarlet_forge_07",
+          "name": "Victor Silex",
+          "shirt_number": 7,
+          "role": "MIL",
+          "stats": {
+            "shot": 45,
+            "dribble": 61,
+            "technique": 54,
+            "defense": 51,
+            "keeper": 30
+          },
+          "techniques": [
+            "drift"
+          ],
+          "karmas": [],
+          "run_speed": 5.05,
+          "sprint_speed": 7.86,
+          "skin_color": "#86583e",
+          "hair_color": "#2e2929"
+        },
+        {
+          "id": "scarlet_forge_08",
+          "name": "Zoé Foyer",
+          "shirt_number": 8,
+          "role": "MIL",
+          "stats": {
+            "shot": 48,
+            "dribble": 55,
+            "technique": 56,
+            "defense": 46,
+            "keeper": 30
+          },
+          "techniques": [
+            "drift"
+          ],
+          "karmas": [],
+          "run_speed": 5.15,
+          "sprint_speed": 7.98,
+          "skin_color": "#b47c58",
+          "hair_color": "#201a18"
+        },
+        {
+          "id": "scarlet_forge_09",
+          "name": "Adam Trempe",
+          "shirt_number": 9,
+          "role": "MIL",
+          "stats": {
+            "shot": 51,
+            "dribble": 60,
+            "technique": 58,
+            "defense": 50,
+            "keeper": 30
+          },
+          "techniques": [
+            "drift"
+          ],
+          "karmas": [],
+          "run_speed": 5.25,
+          "sprint_speed": 8.1,
+          "skin_color": "#d4a082",
+          "hair_color": "#221d27"
+        },
+        {
+          "id": "scarlet_forge_10",
+          "name": "Livia Roux",
+          "shirt_number": 10,
+          "role": "ATT",
+          "stats": {
+            "shot": 58,
+            "dribble": 46,
+            "technique": 53,
+            "defense": 45,
+            "keeper": 30
+          },
+          "techniques": [
+            "orbital_shot"
+          ],
+          "karmas": [],
+          "run_speed": 5.05,
+          "sprint_speed": 7.86,
+          "skin_color": "#704b38",
+          "hair_color": "#2e2929"
+        },
+        {
+          "id": "scarlet_forge_11",
+          "name": "Robin Forge",
+          "shirt_number": 11,
+          "role": "ATT",
+          "stats": {
+            "shot": 61,
+            "dribble": 51,
+            "technique": 45,
+            "defense": 49,
+            "keeper": 30
+          },
+          "techniques": [
+            "orbital_shot"
+          ],
+          "karmas": [],
+          "run_speed": 5.15,
+          "sprint_speed": 7.98,
+          "skin_color": "#bd805e",
+          "hair_color": "#201a18"
+        }
+      ]
+    },
+    {
+      "id": "quartz_mirage",
+      "name": "Mirage de Quartz",
+      "description": "Des dribbleurs mobiles et des tirs qui exploitent la profondeur.",
+      "emblem": "res://assets/ui/routes/quartz_mirage.svg",
+      "kit_color": "#a084cf",
+      "accent_color": "#f3e6ff",
+      "keeper_color": "#d99b45",
+      "recommended_level": 15,
+      "formation": "wide",
+      "ai": {
+        "pressure": 0.34,
+        "shoot_distance": 28,
+        "shot_charge": 0.65,
+        "sprint_distance": 7
+      },
+      "half_seconds": 300,
+      "players": [
+        {
+          "id": "quartz_mirage_01",
+          "name": "Aya Opale",
+          "shirt_number": 1,
+          "role": "GAR",
+          "stats": {
+            "shot": 28,
+            "dribble": 39,
+            "technique": 57,
+            "defense": 55,
+            "keeper": 69
+          },
+          "techniques": [
+            "gyroscopic_stop"
+          ],
+          "karmas": [],
+          "run_speed": 5.15,
+          "sprint_speed": 7.99,
+          "skin_color": "#b47c58",
+          "hair_color": "#a97545"
+        },
+        {
+          "id": "quartz_mirage_02",
+          "name": "Ethan Cristal",
+          "shirt_number": 2,
+          "role": "DEF",
+          "stats": {
+            "shot": 54,
+            "dribble": 56,
+            "technique": 53,
+            "defense": 64,
+            "keeper": 34
+          },
+          "techniques": [
+            "aquablast"
+          ],
+          "karmas": [],
+          "run_speed": 5.25,
+          "sprint_speed": 8.11,
+          "skin_color": "#d4a082",
+          "hair_color": "#3a2633"
+        },
+        {
+          "id": "quartz_mirage_03",
+          "name": "Lila Onyx",
+          "shirt_number": 3,
+          "role": "DEF",
+          "stats": {
+            "shot": 57,
+            "dribble": 61,
+            "technique": 55,
+            "defense": 68,
+            "keeper": 34
+          },
+          "techniques": [
+            "aquablast"
+          ],
+          "karmas": [],
+          "run_speed": 5.35,
+          "sprint_speed": 8.23,
+          "skin_color": "#704b38",
+          "hair_color": "#6d482d"
+        },
+        {
+          "id": "quartz_mirage_04",
+          "name": "Yanis Topaze",
+          "shirt_number": 4,
+          "role": "DEF",
+          "stats": {
+            "shot": 51,
+            "dribble": 55,
+            "technique": 57,
+            "defense": 63,
+            "keeper": 34
+          },
+          "techniques": [
+            "aquablast"
+          ],
+          "karmas": [],
+          "run_speed": 5.15,
+          "sprint_speed": 7.99,
+          "skin_color": "#bd805e",
+          "hair_color": "#a97545"
+        },
+        {
+          "id": "quartz_mirage_05",
+          "name": "Maya Mica",
+          "shirt_number": 5,
+          "role": "DEF",
+          "stats": {
+            "shot": 54,
+            "dribble": 60,
+            "technique": 59,
+            "defense": 67,
+            "keeper": 34
+          },
+          "techniques": [
+            "aquablast"
+          ],
+          "karmas": [],
+          "run_speed": 5.25,
+          "sprint_speed": 8.11,
+          "skin_color": "#edc09d",
+          "hair_color": "#3a2633"
+        },
+        {
+          "id": "quartz_mirage_06",
+          "name": "Elias Prisme",
+          "shirt_number": 6,
+          "role": "MIL",
+          "stats": {
+            "shot": 57,
+            "dribble": 62,
+            "technique": 58,
+            "defense": 53,
+            "keeper": 34
+          },
+          "techniques": [
+            "drift",
+            "combat_blade"
+          ],
+          "karmas": [],
+          "run_speed": 5.35,
+          "sprint_speed": 8.23,
+          "skin_color": "#86583e",
+          "hair_color": "#6d482d"
+        },
+        {
+          "id": "quartz_mirage_07",
+          "name": "Selma Quartz",
+          "shirt_number": 7,
+          "role": "MIL",
+          "stats": {
+            "shot": 51,
+            "dribble": 67,
+            "technique": 60,
+            "defense": 57,
+            "keeper": 34
+          },
+          "techniques": [
+            "drift",
+            "combat_blade"
+          ],
+          "karmas": [],
+          "run_speed": 5.15,
+          "sprint_speed": 7.99,
+          "skin_color": "#b47c58",
+          "hair_color": "#a97545"
+        },
+        {
+          "id": "quartz_mirage_08",
+          "name": "Luca Ambre",
+          "shirt_number": 8,
+          "role": "MIL",
+          "stats": {
+            "shot": 54,
+            "dribble": 61,
+            "technique": 62,
+            "defense": 52,
+            "keeper": 34
+          },
+          "techniques": [
+            "drift",
+            "combat_blade"
+          ],
+          "karmas": [],
+          "run_speed": 5.25,
+          "sprint_speed": 8.11,
+          "skin_color": "#d4a082",
+          "hair_color": "#3a2633"
+        },
+        {
+          "id": "quartz_mirage_09",
+          "name": "Iris Silice",
+          "shirt_number": 9,
+          "role": "MIL",
+          "stats": {
+            "shot": 57,
+            "dribble": 66,
+            "technique": 64,
+            "defense": 56,
+            "keeper": 34
+          },
+          "techniques": [
+            "drift",
+            "combat_blade"
+          ],
+          "karmas": [],
+          "run_speed": 5.35,
+          "sprint_speed": 8.23,
+          "skin_color": "#704b38",
+          "hair_color": "#6d482d"
+        },
+        {
+          "id": "quartz_mirage_10",
+          "name": "Amir Mirage",
+          "shirt_number": 10,
+          "role": "ATT",
+          "stats": {
+            "shot": 64,
+            "dribble": 52,
+            "technique": 59,
+            "defense": 51,
+            "keeper": 34
+          },
+          "techniques": [
+            "magnus_shot"
+          ],
+          "karmas": [],
+          "run_speed": 5.15,
+          "sprint_speed": 7.99,
+          "skin_color": "#bd805e",
+          "hair_color": "#a97545"
+        },
+        {
+          "id": "quartz_mirage_11",
+          "name": "Chloé Éclat",
+          "shirt_number": 11,
+          "role": "ATT",
+          "stats": {
+            "shot": 67,
+            "dribble": 57,
+            "technique": 51,
+            "defense": 55,
+            "keeper": 34
+          },
+          "techniques": [
+            "magnus_shot"
+          ],
+          "karmas": [],
+          "run_speed": 5.25,
+          "sprint_speed": 8.11,
+          "skin_color": "#edc09d",
+          "hair_color": "#3a2633"
+        }
+      ]
+    },
+    {
+      "id": "midnight_watch",
+      "name": "Veilleurs de Minuit",
+      "description": "Une pression soutenue et une gardienne attentive.",
+      "emblem": "res://assets/ui/routes/midnight_watch.svg",
+      "kit_color": "#4266aa",
+      "accent_color": "#dae6ff",
+      "keeper_color": "#c17ba7",
+      "recommended_level": 18,
+      "formation": "press",
+      "ai": {
+        "pressure": 0.62,
+        "shoot_distance": 24,
+        "shot_charge": 0.72,
+        "sprint_distance": 6
+      },
+      "half_seconds": 300,
+      "players": [
+        {
+          "id": "midnight_watch_01",
+          "name": "Célia Vesper",
+          "shirt_number": 1,
+          "role": "GAR",
+          "stats": {
+            "shot": 30,
+            "dribble": 42,
+            "technique": 62,
+            "defense": 59,
+            "keeper": 75
+          },
+          "techniques": [
+            "photo_stop"
+          ],
+          "karmas": [],
+          "run_speed": 5.25,
+          "sprint_speed": 8.12,
+          "skin_color": "#d4a082",
+          "hair_color": "#201a18"
+        },
+        {
+          "id": "midnight_watch_02",
+          "name": "Dorian Nuit",
+          "shirt_number": 2,
+          "role": "DEF",
+          "stats": {
+            "shot": 60,
+            "dribble": 62,
+            "technique": 59,
+            "defense": 70,
+            "keeper": 38
+          },
+          "techniques": [
+            "hurricane_barrier"
+          ],
+          "karmas": [],
+          "run_speed": 5.35,
+          "sprint_speed": 8.24,
+          "skin_color": "#704b38",
+          "hair_color": "#221d27"
+        },
+        {
+          "id": "midnight_watch_03",
+          "name": "Aïcha Lune",
+          "shirt_number": 3,
+          "role": "DEF",
+          "stats": {
+            "shot": 63,
+            "dribble": 67,
+            "technique": 61,
+            "defense": 74,
+            "keeper": 38
+          },
+          "techniques": [
+            "hurricane_barrier"
+          ],
+          "karmas": [],
+          "run_speed": 5.45,
+          "sprint_speed": 8.36,
+          "skin_color": "#bd805e",
+          "hair_color": "#2e2929"
+        },
+        {
+          "id": "midnight_watch_04",
+          "name": "Matteo Sombre",
+          "shirt_number": 4,
+          "role": "DEF",
+          "stats": {
+            "shot": 57,
+            "dribble": 61,
+            "technique": 63,
+            "defense": 69,
+            "keeper": 38
+          },
+          "techniques": [
+            "hurricane_barrier"
+          ],
+          "karmas": [],
+          "run_speed": 5.25,
+          "sprint_speed": 8.12,
+          "skin_color": "#edc09d",
+          "hair_color": "#201a18"
+        },
+        {
+          "id": "midnight_watch_05",
+          "name": "Nina Astrée",
+          "shirt_number": 5,
+          "role": "DEF",
+          "stats": {
+            "shot": 60,
+            "dribble": 66,
+            "technique": 65,
+            "defense": 73,
+            "keeper": 38
+          },
+          "techniques": [
+            "hurricane_barrier"
+          ],
+          "karmas": [],
+          "run_speed": 5.35,
+          "sprint_speed": 8.24,
+          "skin_color": "#86583e",
+          "hair_color": "#221d27"
+        },
+        {
+          "id": "midnight_watch_06",
+          "name": "Owen Vigie",
+          "shirt_number": 6,
+          "role": "MIL",
+          "stats": {
+            "shot": 63,
+            "dribble": 68,
+            "technique": 64,
+            "defense": 59,
+            "keeper": 38
+          },
+          "techniques": [
+            "drift",
+            "combat_blade"
+          ],
+          "karmas": [],
+          "run_speed": 5.45,
+          "sprint_speed": 8.36,
+          "skin_color": "#b47c58",
+          "hair_color": "#2e2929"
+        },
+        {
+          "id": "midnight_watch_07",
+          "name": "Rania Cobalt",
+          "shirt_number": 7,
+          "role": "MIL",
+          "stats": {
+            "shot": 57,
+            "dribble": 73,
+            "technique": 66,
+            "defense": 63,
+            "keeper": 38
+          },
+          "techniques": [
+            "drift",
+            "combat_blade"
+          ],
+          "karmas": [],
+          "run_speed": 5.25,
+          "sprint_speed": 8.12,
+          "skin_color": "#d4a082",
+          "hair_color": "#201a18"
+        },
+        {
+          "id": "midnight_watch_08",
+          "name": "Théo Ombre",
+          "shirt_number": 8,
+          "role": "MIL",
+          "stats": {
+            "shot": 60,
+            "dribble": 67,
+            "technique": 68,
+            "defense": 58,
+            "keeper": 38
+          },
+          "techniques": [
+            "drift",
+            "combat_blade"
+          ],
+          "karmas": [],
+          "run_speed": 5.35,
+          "sprint_speed": 8.24,
+          "skin_color": "#704b38",
+          "hair_color": "#221d27"
+        },
+        {
+          "id": "midnight_watch_09",
+          "name": "Louna Serein",
+          "shirt_number": 9,
+          "role": "MIL",
+          "stats": {
+            "shot": 63,
+            "dribble": 72,
+            "technique": 70,
+            "defense": 62,
+            "keeper": 38
+          },
+          "techniques": [
+            "drift",
+            "combat_blade"
+          ],
+          "karmas": [],
+          "run_speed": 5.45,
+          "sprint_speed": 8.36,
+          "skin_color": "#bd805e",
+          "hair_color": "#2e2929"
+        },
+        {
+          "id": "midnight_watch_10",
+          "name": "Axel Nyx",
+          "shirt_number": 10,
+          "role": "ATT",
+          "stats": {
+            "shot": 70,
+            "dribble": 58,
+            "technique": 65,
+            "defense": 57,
+            "keeper": 38
+          },
+          "techniques": [
+            "orbital_shot"
+          ],
+          "karmas": [],
+          "run_speed": 5.25,
+          "sprint_speed": 8.12,
+          "skin_color": "#edc09d",
+          "hair_color": "#201a18"
+        },
+        {
+          "id": "midnight_watch_11",
+          "name": "Sarah Veille",
+          "shirt_number": 11,
+          "role": "ATT",
+          "stats": {
+            "shot": 73,
+            "dribble": 63,
+            "technique": 57,
+            "defense": 61,
+            "keeper": 38
+          },
+          "techniques": [
+            "orbital_shot"
+          ],
+          "karmas": [],
+          "run_speed": 5.35,
+          "sprint_speed": 8.24,
+          "skin_color": "#86583e",
+          "hair_color": "#221d27"
+        }
+      ]
+    },
+    {
+      "id": "royal_eclipse",
+      "name": "Éclipse Royale",
+      "description": "Une équipe équilibrée qui sanctionne les espaces laissés libres.",
+      "emblem": "res://assets/ui/routes/royal_eclipse.svg",
+      "kit_color": "#d6ae53",
+      "accent_color": "#fff3cc",
+      "keeper_color": "#6860b2",
+      "recommended_level": 22,
+      "formation": "balanced",
+      "ai": {
+        "pressure": 0.72,
+        "shoot_distance": 29,
+        "shot_charge": 0.78,
+        "sprint_distance": 5
+      },
+      "half_seconds": 300,
+      "players": [
+        {
+          "id": "royal_eclipse_01",
+          "name": "Cassandre Solis",
+          "shirt_number": 1,
+          "role": "GAR",
+          "stats": {
+            "shot": 32,
+            "dribble": 45,
+            "technique": 67,
+            "defense": 63,
+            "keeper": 81
+          },
+          "techniques": [
+            "gyroscopic_stop"
+          ],
+          "karmas": [],
+          "run_speed": 5.35,
+          "sprint_speed": 8.25,
+          "skin_color": "#704b38",
+          "hair_color": "#3a2633"
+        },
+        {
+          "id": "royal_eclipse_02",
+          "name": "Ismaël Couronne",
+          "shirt_number": 2,
+          "role": "DEF",
+          "stats": {
+            "shot": 66,
+            "dribble": 68,
+            "technique": 65,
+            "defense": 76,
+            "keeper": 42
+          },
+          "techniques": [
+            "aquablast"
+          ],
+          "karmas": [],
+          "run_speed": 5.45,
+          "sprint_speed": 8.37,
+          "skin_color": "#bd805e",
+          "hair_color": "#6d482d"
+        },
+        {
+          "id": "royal_eclipse_03",
+          "name": "Louise Auréole",
+          "shirt_number": 3,
+          "role": "DEF",
+          "stats": {
+            "shot": 69,
+            "dribble": 73,
+            "technique": 67,
+            "defense": 80,
+            "keeper": 42
+          },
+          "techniques": [
+            "aquablast"
+          ],
+          "karmas": [],
+          "run_speed": 5.55,
+          "sprint_speed": 8.49,
+          "skin_color": "#edc09d",
+          "hair_color": "#a97545"
+        },
+        {
+          "id": "royal_eclipse_04",
+          "name": "Gabriel Sélène",
+          "shirt_number": 4,
+          "role": "DEF",
+          "stats": {
+            "shot": 63,
+            "dribble": 67,
+            "technique": 69,
+            "defense": 75,
+            "keeper": 42
+          },
+          "techniques": [
+            "aquablast"
+          ],
+          "karmas": [],
+          "run_speed": 5.35,
+          "sprint_speed": 8.25,
+          "skin_color": "#86583e",
+          "hair_color": "#3a2633"
+        },
+        {
+          "id": "royal_eclipse_05",
+          "name": "Yara Céleste",
+          "shirt_number": 5,
+          "role": "DEF",
+          "stats": {
+            "shot": 66,
+            "dribble": 72,
+            "technique": 71,
+            "defense": 79,
+            "keeper": 42
+          },
+          "techniques": [
+            "aquablast"
+          ],
+          "karmas": [],
+          "run_speed": 5.45,
+          "sprint_speed": 8.37,
+          "skin_color": "#b47c58",
+          "hair_color": "#6d482d"
+        },
+        {
+          "id": "royal_eclipse_06",
+          "name": "Arthur Zénith",
+          "shirt_number": 6,
+          "role": "MIL",
+          "stats": {
+            "shot": 69,
+            "dribble": 74,
+            "technique": 70,
+            "defense": 65,
+            "keeper": 42
+          },
+          "techniques": [
+            "drift",
+            "combat_blade"
+          ],
+          "karmas": [],
+          "run_speed": 5.55,
+          "sprint_speed": 8.49,
+          "skin_color": "#d4a082",
+          "hair_color": "#a97545"
+        },
+        {
+          "id": "royal_eclipse_07",
+          "name": "Dahlia Solstice",
+          "shirt_number": 7,
+          "role": "MIL",
+          "stats": {
+            "shot": 63,
+            "dribble": 79,
+            "technique": 72,
+            "defense": 69,
+            "keeper": 42
+          },
+          "techniques": [
+            "drift",
+            "combat_blade"
+          ],
+          "karmas": [],
+          "run_speed": 5.35,
+          "sprint_speed": 8.25,
+          "skin_color": "#704b38",
+          "hair_color": "#3a2633"
+        },
+        {
+          "id": "royal_eclipse_08",
+          "name": "Raphaël Halo",
+          "shirt_number": 8,
+          "role": "MIL",
+          "stats": {
+            "shot": 66,
+            "dribble": 73,
+            "technique": 74,
+            "defense": 64,
+            "keeper": 42
+          },
+          "techniques": [
+            "drift",
+            "combat_blade"
+          ],
+          "karmas": [],
+          "run_speed": 5.45,
+          "sprint_speed": 8.37,
+          "skin_color": "#bd805e",
+          "hair_color": "#6d482d"
+        },
+        {
+          "id": "royal_eclipse_09",
+          "name": "Ambre Aurore",
+          "shirt_number": 9,
+          "role": "MIL",
+          "stats": {
+            "shot": 69,
+            "dribble": 78,
+            "technique": 76,
+            "defense": 68,
+            "keeper": 42
+          },
+          "techniques": [
+            "drift",
+            "combat_blade"
+          ],
+          "karmas": [],
+          "run_speed": 5.55,
+          "sprint_speed": 8.49,
+          "skin_color": "#edc09d",
+          "hair_color": "#a97545"
+        },
+        {
+          "id": "royal_eclipse_10",
+          "name": "Nolan Éclipse",
+          "shirt_number": 10,
+          "role": "ATT",
+          "stats": {
+            "shot": 76,
+            "dribble": 64,
+            "technique": 71,
+            "defense": 63,
+            "keeper": 42
+          },
+          "techniques": [
+            "magnus_shot"
+          ],
+          "karmas": [],
+          "run_speed": 5.35,
+          "sprint_speed": 8.25,
+          "skin_color": "#86583e",
+          "hair_color": "#3a2633"
+        },
+        {
+          "id": "royal_eclipse_11",
+          "name": "Élise Équinoxe",
+          "shirt_number": 11,
+          "role": "ATT",
+          "stats": {
+            "shot": 79,
+            "dribble": 69,
+            "technique": 63,
+            "defense": 67,
+            "keeper": 42
+          },
+          "techniques": [
+            "magnus_shot"
+          ],
+          "karmas": [],
+          "run_speed": 5.45,
+          "sprint_speed": 8.37,
+          "skin_color": "#b47c58",
+          "hair_color": "#6d482d"
+        }
+      ]
+    }
+  ],
+  "routes": [
+    {
+      "id": "equinox_circuit",
+      "name": "Circuit des Équinoxes",
+      "description": "Six équipes, deux branches et un sommet. Les victoires ouvrent le chemin ; le meilleur rang reste acquis.",
+      "accent_color": "#e5af65",
+      "nodes": [
+        {
+          "id": "meadow",
+          "type": "match",
+          "name": "Brise des Prés",
+          "team_id": "prairie_breeze",
+          "recommended_level": 6,
+          "position": [
+            40,
+            220
+          ],
+          "requires": [],
+          "rewards": {
+            "first_win": [
+              {
+                "id": "meadow_first_coins",
+                "type": "currency",
+                "amount": 80,
+                "name": "Pièces de première victoire",
+                "min_rank": "B",
+                "chance": 1
+              },
+              {
+                "id": "meadow_first_xp",
+                "type": "xp",
+                "amount": 35,
+                "name": "Expérience d’équipe",
+                "min_rank": "B",
+                "chance": 1
+              }
+            ],
+            "repeat": [
+              {
+                "id": "meadow_coins",
+                "type": "currency",
+                "amount": 20,
+                "name": "Pièces de victoire",
+                "min_rank": "B",
+                "chance": 1
+              },
+              {
+                "id": "meadow_xp",
+                "type": "xp",
+                "amount": 10,
+                "name": "Expérience d’équipe",
+                "min_rank": "B",
+                "chance": 1
+              },
+              {
+                "id": "training_band",
+                "type": "equipment",
+                "amount": 1,
+                "name": "Bande d’entraînement",
+                "min_rank": "A",
+                "chance": 0.2
+              },
+              {
+                "id": "scout_token",
+                "type": "recruitment",
+                "amount": 1,
+                "name": "Insigne de recrutement",
+                "min_rank": "S",
+                "chance": 0.35
+              }
+            ]
+          }
+        },
+        {
+          "id": "crossroads",
+          "type": "branch",
+          "name": "Deux horizons",
+          "description": "Choisissez librement la branche du port ou celle de la forge.",
+          "position": [
+            290,
+            220
+          ],
+          "requires": [
+            {
+              "node": "meadow",
+              "rank": "B"
+            }
+          ],
+          "rewards": {}
+        },
+        {
+          "id": "harbour",
+          "type": "match",
+          "name": "Marins d’Ambre",
+          "team_id": "amber_sailors",
+          "recommended_level": 9,
+          "position": [
+            540,
+            80
+          ],
+          "requires": [
+            {
+              "node": "meadow",
+              "rank": "B"
+            }
+          ],
+          "rewards": {
+            "first_win": [
+              {
+                "id": "harbour_first_coins",
+                "type": "currency",
+                "amount": 105,
+                "name": "Pièces de première victoire",
+                "min_rank": "B",
+                "chance": 1
+              },
+              {
+                "id": "harbour_first_xp",
+                "type": "xp",
+                "amount": 50,
+                "name": "Expérience d’équipe",
+                "min_rank": "B",
+                "chance": 1
+              }
+            ],
+            "repeat": [
+              {
+                "id": "harbour_coins",
+                "type": "currency",
+                "amount": 30,
+                "name": "Pièces de victoire",
+                "min_rank": "B",
+                "chance": 1
+              },
+              {
+                "id": "harbour_xp",
+                "type": "xp",
+                "amount": 15,
+                "name": "Expérience d’équipe",
+                "min_rank": "B",
+                "chance": 1
+              },
+              {
+                "id": "training_band",
+                "type": "equipment",
+                "amount": 1,
+                "name": "Bande d’entraînement",
+                "min_rank": "A",
+                "chance": 0.2
+              },
+              {
+                "id": "scout_token",
+                "type": "recruitment",
+                "amount": 1,
+                "name": "Insigne de recrutement",
+                "min_rank": "S",
+                "chance": 0.35
+              }
+            ]
+          }
+        },
+        {
+          "id": "forge",
+          "type": "match",
+          "name": "Forge Écarlate",
+          "team_id": "scarlet_forge",
+          "recommended_level": 12,
+          "position": [
+            540,
+            370
+          ],
+          "requires": [
+            {
+              "node": "meadow",
+              "rank": "B"
+            }
+          ],
+          "rewards": {
+            "first_win": [
+              {
+                "id": "forge_first_coins",
+                "type": "currency",
+                "amount": 130,
+                "name": "Pièces de première victoire",
+                "min_rank": "B",
+                "chance": 1
+              },
+              {
+                "id": "forge_first_xp",
+                "type": "xp",
+                "amount": 65,
+                "name": "Expérience d’équipe",
+                "min_rank": "B",
+                "chance": 1
+              }
+            ],
+            "repeat": [
+              {
+                "id": "forge_coins",
+                "type": "currency",
+                "amount": 40,
+                "name": "Pièces de victoire",
+                "min_rank": "B",
+                "chance": 1
+              },
+              {
+                "id": "forge_xp",
+                "type": "xp",
+                "amount": 20,
+                "name": "Expérience d’équipe",
+                "min_rank": "B",
+                "chance": 1
+              },
+              {
+                "id": "training_band",
+                "type": "equipment",
+                "amount": 1,
+                "name": "Bande d’entraînement",
+                "min_rank": "A",
+                "chance": 0.2
+              },
+              {
+                "id": "scout_token",
+                "type": "recruitment",
+                "amount": 1,
+                "name": "Insigne de recrutement",
+                "min_rank": "S",
+                "chance": 0.35
+              }
+            ]
+          }
+        },
+        {
+          "id": "quartz",
+          "type": "match",
+          "name": "Mirage de Quartz",
+          "team_id": "quartz_mirage",
+          "recommended_level": 15,
+          "position": [
+            790,
+            80
+          ],
+          "requires": [
+            {
+              "node": "harbour",
+              "rank": "B"
+            }
+          ],
+          "rewards": {
+            "first_win": [
+              {
+                "id": "quartz_first_coins",
+                "type": "currency",
+                "amount": 155,
+                "name": "Pièces de première victoire",
+                "min_rank": "B",
+                "chance": 1
+              },
+              {
+                "id": "quartz_first_xp",
+                "type": "xp",
+                "amount": 80,
+                "name": "Expérience d’équipe",
+                "min_rank": "B",
+                "chance": 1
+              }
+            ],
+            "repeat": [
+              {
+                "id": "quartz_coins",
+                "type": "currency",
+                "amount": 50,
+                "name": "Pièces de victoire",
+                "min_rank": "B",
+                "chance": 1
+              },
+              {
+                "id": "quartz_xp",
+                "type": "xp",
+                "amount": 25,
+                "name": "Expérience d’équipe",
+                "min_rank": "B",
+                "chance": 1
+              },
+              {
+                "id": "training_band",
+                "type": "equipment",
+                "amount": 1,
+                "name": "Bande d’entraînement",
+                "min_rank": "A",
+                "chance": 0.2
+              },
+              {
+                "id": "scout_token",
+                "type": "recruitment",
+                "amount": 1,
+                "name": "Insigne de recrutement",
+                "min_rank": "S",
+                "chance": 0.35
+              }
+            ]
+          }
+        },
+        {
+          "id": "midnight",
+          "type": "match",
+          "name": "Veilleurs de Minuit",
+          "team_id": "midnight_watch",
+          "recommended_level": 18,
+          "position": [
+            790,
+            370
+          ],
+          "requires": [
+            {
+              "node": "forge",
+              "rank": "B"
+            }
+          ],
+          "rewards": {
+            "first_win": [
+              {
+                "id": "midnight_first_coins",
+                "type": "currency",
+                "amount": 180,
+                "name": "Pièces de première victoire",
+                "min_rank": "B",
+                "chance": 1
+              },
+              {
+                "id": "midnight_first_xp",
+                "type": "xp",
+                "amount": 95,
+                "name": "Expérience d’équipe",
+                "min_rank": "B",
+                "chance": 1
+              }
+            ],
+            "repeat": [
+              {
+                "id": "midnight_coins",
+                "type": "currency",
+                "amount": 60,
+                "name": "Pièces de victoire",
+                "min_rank": "B",
+                "chance": 1
+              },
+              {
+                "id": "midnight_xp",
+                "type": "xp",
+                "amount": 30,
+                "name": "Expérience d’équipe",
+                "min_rank": "B",
+                "chance": 1
+              },
+              {
+                "id": "training_band",
+                "type": "equipment",
+                "amount": 1,
+                "name": "Bande d’entraînement",
+                "min_rank": "A",
+                "chance": 0.2
+              },
+              {
+                "id": "scout_token",
+                "type": "recruitment",
+                "amount": 1,
+                "name": "Insigne de recrutement",
+                "min_rank": "S",
+                "chance": 0.35
+              }
+            ]
+          }
+        },
+        {
+          "id": "merit_gate",
+          "type": "gate",
+          "name": "Porte du mérite",
+          "description": "Remportez les deux branches. Un rang A sur Mirage ou Minuit ouvre la finale.",
+          "position": [
+            1040,
+            220
+          ],
+          "requires": [
+            {
+              "node": "quartz",
+              "rank": "B"
+            },
+            {
+              "node": "midnight",
+              "rank": "B"
+            }
+          ],
+          "requires_any": [
+            {
+              "node": "quartz",
+              "rank": "A"
+            },
+            {
+              "node": "midnight",
+              "rank": "A"
+            }
+          ],
+          "rewards": {}
+        },
+        {
+          "id": "eclipse",
+          "type": "match",
+          "name": "Éclipse Royale",
+          "team_id": "royal_eclipse",
+          "recommended_level": 22,
+          "position": [
+            1290,
+            220
+          ],
+          "requires": [
+            {
+              "node": "merit_gate"
+            }
+          ],
+          "rewards": {
+            "first_win": [
+              {
+                "id": "eclipse_first_coins",
+                "type": "currency",
+                "amount": 205,
+                "name": "Pièces de première victoire",
+                "min_rank": "B",
+                "chance": 1
+              },
+              {
+                "id": "eclipse_first_xp",
+                "type": "xp",
+                "amount": 110,
+                "name": "Expérience d’équipe",
+                "min_rank": "B",
+                "chance": 1
+              }
+            ],
+            "repeat": [
+              {
+                "id": "eclipse_coins",
+                "type": "currency",
+                "amount": 70,
+                "name": "Pièces de victoire",
+                "min_rank": "B",
+                "chance": 1
+              },
+              {
+                "id": "eclipse_xp",
+                "type": "xp",
+                "amount": 35,
+                "name": "Expérience d’équipe",
+                "min_rank": "B",
+                "chance": 1
+              },
+              {
+                "id": "training_band",
+                "type": "equipment",
+                "amount": 1,
+                "name": "Bande d’entraînement",
+                "min_rank": "A",
+                "chance": 0.2
+              },
+              {
+                "id": "scout_token",
+                "type": "recruitment",
+                "amount": 1,
+                "name": "Insigne de recrutement",
+                "min_rank": "S",
+                "chance": 0.35
+              }
+            ]
+          }
+        },
+        {
+          "id": "victory_chest",
+          "type": "reward",
+          "name": "Coffre des Équinoxes",
+          "description": "Une récompense unique pour la victoire en finale.",
+          "position": [
+            1540,
+            220
+          ],
+          "requires": [
+            {
+              "node": "eclipse",
+              "rank": "B"
+            }
+          ],
+          "rewards": {
+            "claim": [
+              {
+                "id": "equinox_medal",
+                "type": "item",
+                "amount": 1,
+                "name": "Médaille des Équinoxes",
+                "min_rank": "B",
+                "chance": 1
+              },
+              {
+                "id": "champion_scout",
+                "type": "recruitment",
+                "amount": 3,
+                "name": "Insigne de recrutement",
+                "min_rank": "B",
+                "chance": 1
+              },
+              {
+                "id": "magnus_shot",
+                "type": "technique",
+                "amount": 1,
+                "name": "Tir Magnus",
+                "min_rank": "B",
+                "chance": 1
+              }
+            ]
+          }
+        }
+      ],
+      "edges": [
+        [
+          "meadow",
+          "crossroads"
+        ],
+        [
+          "crossroads",
+          "harbour"
+        ],
+        [
+          "crossroads",
+          "forge"
+        ],
+        [
+          "harbour",
+          "quartz"
+        ],
+        [
+          "forge",
+          "midnight"
+        ],
+        [
+          "quartz",
+          "merit_gate"
+        ],
+        [
+          "midnight",
+          "merit_gate"
+        ],
+        [
+          "merit_gate",
+          "eclipse"
+        ],
+        [
+          "eclipse",
+          "victory_chest"
+        ]
+      ]
+    },
+    {
+      "id": "harbour_rematches",
+      "name": "Défis du Littoral",
+      "description": "Un second tableau indépendant pour s’entraîner contre trois équipes déjà connues.",
+      "accent_color": "#4bd9c3",
+      "nodes": [
+        {
+          "id": "coast_start",
+          "type": "match",
+          "name": "Brise des Prés",
+          "team_id": "prairie_breeze",
+          "recommended_level": 6,
+          "position": [
+            60,
+            170
+          ],
+          "requires": [],
+          "rewards": {
+            "first_win": [
+              {
+                "id": "coast_start_first_coins",
+                "type": "currency",
+                "amount": 80,
+                "name": "Pièces de première victoire",
+                "min_rank": "B",
+                "chance": 1
+              },
+              {
+                "id": "coast_start_first_xp",
+                "type": "xp",
+                "amount": 35,
+                "name": "Expérience d’équipe",
+                "min_rank": "B",
+                "chance": 1
+              }
+            ],
+            "repeat": [
+              {
+                "id": "coast_start_coins",
+                "type": "currency",
+                "amount": 20,
+                "name": "Pièces de victoire",
+                "min_rank": "B",
+                "chance": 1
+              },
+              {
+                "id": "coast_start_xp",
+                "type": "xp",
+                "amount": 10,
+                "name": "Expérience d’équipe",
+                "min_rank": "B",
+                "chance": 1
+              },
+              {
+                "id": "training_band",
+                "type": "equipment",
+                "amount": 1,
+                "name": "Bande d’entraînement",
+                "min_rank": "A",
+                "chance": 0.2
+              },
+              {
+                "id": "scout_token",
+                "type": "recruitment",
+                "amount": 1,
+                "name": "Insigne de recrutement",
+                "min_rank": "S",
+                "chance": 0.35
+              }
+            ]
+          }
+        },
+        {
+          "id": "coast_amber",
+          "type": "match",
+          "name": "Marins d’Ambre",
+          "team_id": "amber_sailors",
+          "recommended_level": 9,
+          "position": [
+            330,
+            170
+          ],
+          "requires": [
+            {
+              "node": "coast_start",
+              "rank": "B"
+            }
+          ],
+          "rewards": {
+            "first_win": [
+              {
+                "id": "coast_amber_first_coins",
+                "type": "currency",
+                "amount": 105,
+                "name": "Pièces de première victoire",
+                "min_rank": "B",
+                "chance": 1
+              },
+              {
+                "id": "coast_amber_first_xp",
+                "type": "xp",
+                "amount": 50,
+                "name": "Expérience d’équipe",
+                "min_rank": "B",
+                "chance": 1
+              }
+            ],
+            "repeat": [
+              {
+                "id": "coast_amber_coins",
+                "type": "currency",
+                "amount": 30,
+                "name": "Pièces de victoire",
+                "min_rank": "B",
+                "chance": 1
+              },
+              {
+                "id": "coast_amber_xp",
+                "type": "xp",
+                "amount": 15,
+                "name": "Expérience d’équipe",
+                "min_rank": "B",
+                "chance": 1
+              },
+              {
+                "id": "training_band",
+                "type": "equipment",
+                "amount": 1,
+                "name": "Bande d’entraînement",
+                "min_rank": "A",
+                "chance": 0.2
+              },
+              {
+                "id": "scout_token",
+                "type": "recruitment",
+                "amount": 1,
+                "name": "Insigne de recrutement",
+                "min_rank": "S",
+                "chance": 0.35
+              }
+            ]
+          }
+        },
+        {
+          "id": "coast_quartz",
+          "type": "match",
+          "name": "Mirage de Quartz",
+          "team_id": "quartz_mirage",
+          "recommended_level": 15,
+          "position": [
+            600,
+            170
+          ],
+          "requires": [
+            {
+              "node": "coast_amber",
+              "rank": "A"
+            }
+          ],
+          "rewards": {
+            "first_win": [
+              {
+                "id": "coast_quartz_first_coins",
+                "type": "currency",
+                "amount": 155,
+                "name": "Pièces de première victoire",
+                "min_rank": "B",
+                "chance": 1
+              },
+              {
+                "id": "coast_quartz_first_xp",
+                "type": "xp",
+                "amount": 80,
+                "name": "Expérience d’équipe",
+                "min_rank": "B",
+                "chance": 1
+              }
+            ],
+            "repeat": [
+              {
+                "id": "coast_quartz_coins",
+                "type": "currency",
+                "amount": 50,
+                "name": "Pièces de victoire",
+                "min_rank": "B",
+                "chance": 1
+              },
+              {
+                "id": "coast_quartz_xp",
+                "type": "xp",
+                "amount": 25,
+                "name": "Expérience d’équipe",
+                "min_rank": "B",
+                "chance": 1
+              },
+              {
+                "id": "training_band",
+                "type": "equipment",
+                "amount": 1,
+                "name": "Bande d’entraînement",
+                "min_rank": "A",
+                "chance": 0.2
+              },
+              {
+                "id": "scout_token",
+                "type": "recruitment",
+                "amount": 1,
+                "name": "Insigne de recrutement",
+                "min_rank": "S",
+                "chance": 0.35
+              }
+            ]
+          }
+        }
+      ],
+      "edges": [
+        [
+          "coast_start",
+          "coast_amber"
+        ],
+        [
+          "coast_amber",
+          "coast_quartz"
+        ]
+      ]
+    }
+  ]
+}

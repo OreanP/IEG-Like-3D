@@ -28,6 +28,8 @@ var _initialized: bool = false
 var _shot_technique: String = ""
 var _shot_charge: float = 0.0
 var _sprinting: Dictionary = {}
+var team_ai: Dictionary = {}
+var profile_stats_enabled: bool = false
 
 func _init(profiles: Array[IEGPlayerProfile] = [], starts: Array[Vector2] = [],
         teams: Array[int] = [], keeper_roles: Array[bool] = [], half_seconds: float = 300.0) -> void:
@@ -40,6 +42,36 @@ func _init(profiles: Array[IEGPlayerProfile] = [], starts: Array[Vector2] = [],
     _initialized = true
     _reset_positions()
     events.clear()
+
+func configure_team(team: int, display_name: String, formation: String = "balanced", ai: Dictionary = {}) -> bool:
+    # Configuration initiale du même moteur, avant le premier tick seulement.
+    if (team not in [0, 1] or display_name.is_empty() or formation not in ["balanced", "wide", "press"]
+            or phase != Phase.LIVE or period != 1 or elapsed_half > 0.0 or _duel_count > 0):
+        return false
+    var defaults: Dictionary = {"pressure": 0.2, "shoot_distance": 21.0, "shot_charge": 0.65, "sprint_distance": 8.0}
+    var limits: Dictionary = {"pressure": Vector2(0, 1), "shoot_distance": Vector2(5, 30), "shot_charge": Vector2(0, 1), "sprint_distance": Vector2(1, 25)}
+    for key: String in defaults:
+        var value: Variant = ai.get(key, defaults[key])
+        if typeof(value) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(value)):
+            return false
+        defaults[key] = clampf(float(value), limits[key].x, limits[key].y)
+    team_names[team] = display_name
+    formations[team] = formation
+    team_ai[team] = defaults
+    profile_stats_enabled = true
+    for player: IEGPlayerState in players:
+        if player.team_id != team:
+            continue
+        var source: Vector2 = _base_spawns[player.get_id()]
+        if not player.is_goalkeeper:
+            if formation == "wide":
+                source.x *= 1.3
+            elif formation == "press":
+                source.y += attack_direction(team) * 5.0
+        player.spawn = _clamp_player(source)
+    _reset_positions()
+    events.clear()
+    return true
 
 func attack_direction(team: int) -> float:
     var initial: float = -1.0 if team == 0 else 1.0
@@ -157,7 +189,7 @@ func request_duel(actor_id: int, target_id: int, kind: String = "field") -> bool
         "ai_choice": "left" if (_duel_count + target_id) % 2 == 0 else "right",
         "ai_special": (_duel_count + target_id) % 3 == 0, "shot_charge": _shot_charge,
         "techniques": catalog.all_definitions(), "prepaid_technique": ""}
-    if kind == "keeper" and not _shot_technique.is_empty() and actor.team_id != LOCAL_TEAM:
+    if kind in ["keeper", "block"] and not _shot_technique.is_empty() and actor.team_id != LOCAL_TEAM:
         duel["attack_technique"] = _shot_technique
     phase = Phase.DUEL_CHOICE
     cinematic_elapsed = 0.0
@@ -184,9 +216,16 @@ func choose_duel(choice: String, technique_id: String = "") -> bool:
     var defense_choice: String = String(duel["ai_choice"]) if is_attack else choice
     var attack_tech: String = technique_id if is_attack and choice == "special" else ""
     var defense_tech: String = technique_id if not is_attack and choice == "special" else ""
+    if not is_attack and not prepaid_shot:
+        var prepared: String = String(duel.get("attack_technique", ""))
+        if not prepared.is_empty():
+            if not _technique_available(attacker, prepared, "TIR"):
+                return false
+            attack_tech = prepared
+            attack_choice = "special"
     if not prepaid_id.is_empty():
         attack_tech = prepaid_id
-    var chosen_attack_technique: String = attack_tech if is_attack else String(duel.get("prepaid_technique", ""))
+    var chosen_attack_technique: String = attack_tech
     if duel["kind"] in ["keeper", "block"] and attacker.position.distance_to(attacking_goal(attacker.team_id)) > shot_range(attacker, chosen_attack_technique):
         return false
     var ai_actor: IEGPlayerState = defender if is_attack else attacker
@@ -197,7 +236,7 @@ func choose_duel(choice: String, technique_id: String = "") -> bool:
             defense_choice = "special"
             defense_tech = ai_tech
         else:
-            if not prepaid_shot:
+            if not prepaid_shot and attack_tech.is_empty():
                 attack_choice = "special"
                 attack_tech = ai_tech
     # Les bonus de l'invocation participent au duel même si son paiement l'épuise.
@@ -422,9 +461,17 @@ func _shoot(actor: IEGPlayerState, aim: Vector2, charge: float) -> void:
     var keeper: IEGPlayerState = keeper_for_team(1 - actor.team_id)
     if keeper != null:
         _shot_charge = charge
+        var distance: float = actor.position.distance_to(attacking_goal(actor.team_id))
         if actor.team_id != LOCAL_TEAM:
             _shot_technique = ""
-        var distance: float = actor.position.distance_to(attacking_goal(actor.team_id))
+            # Le profil IA peut demander une frappe lointaine. Choisir une
+            # technique réellement possédée et payable, avant d'ouvrir le duel.
+            if distance > 24.0:
+                for definition: Dictionary in get_available_techniques(actor.get_id(), "TIR"):
+                    var id: String = String(definition["id"])
+                    if distance <= shot_range(actor, id) and _technique_available(actor, id, "TIR"):
+                        _shot_technique = id
+                        break
         if distance > 24.0 and not _technique_available(actor, _shot_technique, "TIR"):
             return
         var blocker: IEGPlayerState = _shot_blocker(actor)
@@ -783,6 +830,11 @@ func get_stat_bonuses(player_id: int) -> Dictionary:
 
 func _modifier_bonus(player: IEGPlayerState, stat: String = "") -> float:
     var bonus: float = 0.0
+    if profile_stats_enabled and not stat.is_empty():
+        # 50 est la référence du moteur ; les profils de parcours utilisent
+        # les mêmes statistiques que les héritages de Résonance.
+        bonus += (float(player.profile.base_stats.get(stat, 50.0)) - 50.0) * 0.25
+        bonus += (float(player.profile.base_stats.get("technique", 50.0)) - 50.0) * 0.05
     var stats: Dictionary = get_stat_bonuses(player.get_id())
     if not stat.is_empty():
         bonus += float(stats.get(stat, 0.0))
@@ -848,6 +900,7 @@ func build_ai_commands() -> Dictionary:
         var target: Vector2 = player.spawn
         var forward: float = attack_direction(player.team_id)
         var properties: Dictionary = catalog.get_definition(String(tactics[player.team_id])).get("properties", {})
+        var ai: Dictionary = team_ai.get(player.team_id, {})
         if player.is_goalkeeper:
             target = Vector2(clampf(point.x * 0.35, -4.8, 4.8), -forward * (half_length - 2.0))
             if ball.owner_id == player.get_id():
@@ -859,15 +912,15 @@ func build_ai_commands() -> Dictionary:
         elif ball.owner_id == player.get_id():
             if player.team_id != LOCAL_TEAM:
                 target = attacking_goal(player.team_id)
-                command.shoot = player.position.distance_to(target) < 21.0
-                command.shot_charge = 0.65
+                command.shoot = player.position.distance_to(target) < float(ai.get("shoot_distance", 21.0))
+                command.shot_charge = float(ai.get("shot_charge", 0.65))
         elif (owner == null or owner.team_id != player.team_id) and chasers[player.team_id] == player:
             target = point
             command.tackle = owner != null and player.position.distance_to(owner.position) < 1.5
-            command.sprint = player.position.distance_to(point) > 8.0
+            command.sprint = player.position.distance_to(point) > float(ai.get("sprint_distance", 8.0))
         else:
             target.x *= float(properties.get("width_factor", 1.0))
-            target.y = clampf(target.y + point.y * 0.3 + forward * float(properties.get("pressure", 0.2)) * 5.0, -half_length + 8.0, half_length - 8.0)
+            target.y = clampf(target.y + point.y * 0.3 + forward * float(properties.get("pressure", ai.get("pressure", 0.2))) * 5.0, -half_length + 8.0, half_length - 8.0)
             if owner != null and owner.team_id == player.team_id and target.distance_to(owner.position) < 4.0:
                 target.x += -4.5 if player.spawn.x <= 0.0 else 4.5
         target = _clamp_player(target)
