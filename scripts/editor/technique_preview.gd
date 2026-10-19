@@ -1,7 +1,10 @@
 extends SubViewportContainer
 ## Aperçu 3D autonome : aucune règle de simulation n'est résolue ici.
-## Les gardiens ont un début partagé, puis deux fins après le temps des scores.
+## Les techniques utilisent la même mise en scène que les duels du match.
+## Les gardiens partagent leur préparation avant les trois issues révélées.
 
+const Cinematic = preload("res://scripts/presentation/duel_cinematic.gd")
+const Catalog = preload("res://core/content/technique_catalog.gd")
 const ModifierVisual = preload("res://scripts/presentation/modifier_visual.gd")
 const PlayerScene = preload("res://scenes/characters/player_view.tscn")
 const VisualTheme = preload("res://scripts/presentation/visual_theme.gd")
@@ -23,6 +26,15 @@ var _sparks: Array[MeshInstance3D] = []
 var _frame: Array[MeshInstance3D] = []
 var _material: StandardMaterial3D
 var _label: Label
+var _cinematic: IEGDuelCinematic
+var _preview_defender: Node3D
+var _modifier_mount: Node3D
+var _catalog_definitions: Array[Dictionary] = []
+var _uses_cinematic: bool = false
+var _replay_wait: float = 0.0
+# Les stages détachés par stop() peuvent encore attendre la fin de la frame.
+# Ils doivent disparaître avant les matériaux du studio lors d'un free() direct.
+var _owned_stages: Array[Node3D] = []
 
 func _ready() -> void:
     stretch = true
@@ -176,21 +188,58 @@ func _ready() -> void:
     _label.add_theme_constant_override("shadow_offset_x", 2)
     _label.add_theme_constant_override("shadow_offset_y", 2)
     canvas.add_child(_label)
+    _modifier_mount = Node3D.new()
+    world.add_child(_modifier_mount)
     _modifier = ModifierVisual.new()
-    world.add_child(_modifier)
+    _modifier_mount.add_child(_modifier)
     _modifier.visible = false
+    _preview_defender = PlayerScene.instantiate()
+    _preview_defender.name = "PreviewOpponent"
+    var opponent_profile := IEGPlayerProfile.new()
+    opponent_profile.kit_color = Color("c05a69")
+    opponent_profile.shirt_number = 1
+    _preview_defender.profile = opponent_profile
+    world.add_child(_preview_defender)
+    _preview_defender.visible = false
+    _cinematic = Cinematic.new()
+    world.add_child(_cinematic)
+    _cinematic.reveal.connect(_show_cinematic_result)
+    _cinematic.finished.connect(func() -> void: _replay_wait = 0.0)
+    if _catalog_definitions.is_empty():
+        _catalog_definitions = Catalog.new().all_definitions()
     if not _definition.is_empty():
         set_definition(_definition)
 
+func set_catalog_definitions(definitions: Array[Dictionary]) -> void:
+    # Utiliser aussi les fiches locales non sauvegardées et leurs liens édités.
+    _catalog_definitions = definitions.duplicate(true)
+
 func set_definition(definition: Dictionary) -> void:
+    if _cinematic != null:
+        _cinematic.stop()
     _definition = definition.duplicate(true)
     _time = 0.0
+    _replay_wait = 0.0
+    _uses_cinematic = str(_definition.get("category", "")) in ["TIR", "ATT", "DEF", "GAR"]
     if _modifier != null:
         _modifier.configure(_definition)
-        _modifier.visible = str(_definition.get("category", "")) in ["KARMA", "RESONANCE"] or _modifier.style in ["astreion", "thalassa", "sovereign_orbit", "deep_watch"]
-        _modifier.position = Vector3(0, 0, 0.7) if _modifier.style in ["astreion", "thalassa"] else Vector3.ZERO
-        _camera.position = Vector3(5.6, 3.5, -8.0) if _modifier.style in ["astreion", "thalassa"] else Vector3(4.3, 2.8, -6.2)
-        _camera.look_at(Vector3(0, 1.8 if _modifier.style in ["astreion", "thalassa"] else 1.0, 0))
+        _modifier.visible = str(_definition.get("category", "")) in ["KARMA", "RESONANCE"] or _definition.get("properties", {}).has("karma_id") or _modifier.style in ["astreion", "thalassa", "sovereign_orbit", "deep_watch", "vaelis", "orvann"]
+        var is_spirit: bool = str(_definition.get("category", "")) == "KARMA" or _modifier.style in ["astreion", "thalassa", "vaelis", "orvann"]
+        _modifier.position = Vector3(0, 0, 0.7) if is_spirit else Vector3.ZERO
+        _modifier_mount.visible = not _uses_cinematic
+        _camera.position = Vector3(5.6, 3.5, -8.0) if is_spirit else Vector3(4.3, 2.8, -6.2)
+        _camera.look_at(Vector3(0, 1.8 if is_spirit else 1.0, 0))
+        _camera.make_current()
+        _preview_defender.visible = _uses_cinematic
+        _actor.position = Vector3(0, 0, -3) if _uses_cinematic else Vector3.ZERO
+        _actor.rotation = Vector3.ZERO
+        _preview_defender.position = Vector3(0, 0, 3)
+        _preview_defender.rotation = Vector3(0, PI, 0)
+        if _skeleton != null:
+            for index: int in _rig_poses:
+                _skeleton.set_bone_pose_rotation(index, _rig_poses[index])
+        if _uses_cinematic:
+            _start_cinematic()
     if _material != null:
         _material.albedo_color = Color(String(_definition.get("color", "#a99aff")))
         _material.emission = _material.albedo_color
@@ -199,14 +248,91 @@ func set_failure(value: bool) -> void:
     _failure = value
     _outcome = "goal" if value else "capture"
     _time = 0.0
+    if _cinematic != null and _uses_cinematic:
+        _start_cinematic()
 
 func set_outcome(value: String) -> void:
     _outcome = value if value in ["capture", "deflection", "goal"] else "capture"
     _failure = _outcome == "goal"
     _time = 0.0
+    if _cinematic != null and _uses_cinematic:
+        _start_cinematic()
+
+func _start_cinematic() -> void:
+    _cinematic.stop()
+    _replay_wait = 0.0
+    for mesh: MeshInstance3D in _rings + _sparks + _frame:
+        mesh.visible = false
+    var category: String = str(_definition.get("category", ""))
+    var defending: bool = category in ["DEF", "GAR"]
+    var keeper: bool = category in ["TIR", "GAR"]
+    var block: bool = category == "DEF" and bool(_definition.get("properties", {}).get("block", false))
+    var attacker_won: bool = _failure if defending else not _failure
+    var definitions: Array[Dictionary] = _catalog_definitions.duplicate(true)
+    var selected_id: String = str(_definition.get("id", ""))
+    var found: bool = false
+    for index: int in definitions.size():
+        if str(definitions[index].get("id", "")) == selected_id:
+            definitions[index] = _definition.duplicate(true)
+            found = true
+            break
+    if not found:
+        definitions.append(_definition.duplicate(true))
+    var timing: Dictionary = Catalog.cinematic_timing({} if defending else _definition, _definition if defending else {})
+    var ending: String = "dribble" if attacker_won else "tackle"
+    if keeper:
+        ending = _outcome if category == "GAR" else ("goal" if attacker_won else "capture")
+    elif block:
+        ending = "shot_continues" if attacker_won else "block"
+    var result: Dictionary = {
+        "kind": "keeper" if keeper else ("block" if block else "field"),
+        "actor_id": 7, "target_id": 1,
+        "attack_choice": "left" if defending else "special",
+        "defend_choice": "special" if defending else "right",
+        "attack_technique": "" if defending else selected_id,
+        "defend_technique": selected_id if defending else "",
+        "attack_score": 145 if attacker_won else 112,
+        "defend_score": (119 if ending == "deflection" else 145) if not attacker_won else 112,
+        "winner_id": 7 if attacker_won else 1,
+        "attacker_won": attacker_won,
+        "outcome": ending, "result": "parry" if ending == "deflection" else ending,
+        "duration": timing["duration"], "reveal_time": timing["reveal_time"],
+        "techniques": definitions}
+    _ball.position = Vector3(0.3, 0.17, -2.4)
+    _cinematic.begin(result, _actor, _preview_defender, _ball)
+    for index: int in range(_owned_stages.size() - 1, -1, -1):
+        if not is_instance_valid(_owned_stages[index]):
+            _owned_stages.remove_at(index)
+    _owned_stages.append(_cinematic._stage)
+    _label.text = str(_definition.get("name", "")) + " / préparation commune" if category == "GAR" else str(_definition.get("name", "")) + " / préparation"
+
+func _show_cinematic_result() -> void:
+    var outcome_text: String = "TECHNIQUE RÉUSSIE" if not _failure else "TECHNIQUE CONTRÉE"
+    if str(_definition.get("category", "")) == "GAR":
+        outcome_text = {"capture": "CAPTURE / ballon maîtrisé", "deflection": "DÉVIATION / ballon libre", "goal": "ÉCHEC / la garde cède"}.get(_outcome, "")
+    _label.text = "%d CONTRE %d / %s" % [int(_cinematic.duel_data.attack_score), int(_cinematic.duel_data.defend_score), outcome_text]
+
+func _exit_tree() -> void:
+    if is_instance_valid(_cinematic):
+        _cinematic.stop()
+    # Les modèles fantômes empruntent les matériaux des deux joueurs. Libérer
+    # leurs stages détachés pendant que ces joueurs existent encore évite des
+    # RID de matériaux invalides si l'atelier est détruit avant la frame suivante.
+    for stage: Node3D in _owned_stages:
+        if is_instance_valid(stage) and not stage.is_inside_tree():
+            stage.free()
+    _owned_stages.clear()
 
 func _process(delta: float) -> void:
     if _actor == null or _definition.is_empty():
+        return
+    if _uses_cinematic:
+        if _cinematic.active:
+            _cinematic.advance(delta)
+        else:
+            _replay_wait += delta
+            if _replay_wait >= 0.8:
+                _start_cinematic()
         return
     _material.albedo_color = Color(String(_definition.get("color", "#a99aff")))
     _material.emission = _material.albedo_color
@@ -399,7 +525,7 @@ func _render_modifier_preview(t: float, branch: float, release: float, effect: S
                 _ball.position = Vector3(0, 1.1 - release * 0.1, -0.45 + release * 0.15)
         var ending: String = {"capture": "CAPTURE — voûte refermée", "deflection": "DÉVIATION — ballon libre", "goal": "ÉCHEC — voûte brisée"}.get(_outcome, "")
         _label.text = ending if t >= branch else "SIGNATURE / préparation commune"
-    elif _modifier.style in ["astreion", "thalassa"]:
+    elif str(_definition.get("category", "")) == "KARMA":
         _label.text = "KARMA / forme invoquée"
     else:
         _label.text = "RÉSONANCE / marques du donneur"

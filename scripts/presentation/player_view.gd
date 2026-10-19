@@ -12,6 +12,7 @@ extends Node3D
 const ModifierVisual = preload("res://scripts/presentation/modifier_visual.gd")
 var _modifier_views: Dictionary = {}
 var _modifier_time: float = 0.0
+var _modifier_origins: Dictionary = {}
 var _animations: AnimationPlayer
 var _clips: Dictionary = {}
 var _current: String = ""
@@ -172,13 +173,17 @@ func sync_modifier_visuals(definitions: Array[Dictionary], delta: float = 0.0) -
                 modifier.position = Vector3(0, 0, 0.85)
                 modifier.scale = Vector3.ONE * 0.82
             _modifier_views[id] = modifier
+            # Une invocation commence à son activation, même après plusieurs
+            # minutes de jeu. Cette horloge reste purement visuelle.
+            _modifier_origins[id] = _modifier_time
         elif _modifier_views[id].definition != definition:
             # L’atelier peut modifier une forme déjà active : rafraîchir sans changer ses budgets.
             _modifier_views[id].configure(definition)
-        _modifier_views[id].set_presentation(_modifier_time)
+        _modifier_views[id].set_presentation(_modifier_time - float(_modifier_origins.get(id, 0.0)))
     for id: String in _modifier_views.keys():
         if not wanted.has(id):
             var modifier: Node3D = _modifier_views[id]
             remove_child(modifier)
             modifier.queue_free()
             _modifier_views.erase(id)
+            _modifier_origins.erase(id)

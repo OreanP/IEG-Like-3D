@@ -34,6 +34,7 @@ run_checked scene-input --script res://tests/development/scene_smoke.gd
 run_checked training res://scenes/training_ground.tscn --quit-after 180
 run_checked match-input --script res://tests/match/scene_smoke.gd
 run_checked augmentation-input --script res://tests/match/augmentation_scene_smoke.gd
+run_checked new-content-input --script res://tests/match/new_content_scene_smoke.gd
 run_checked route-board res://scenes/routes.tscn --quit-after 120
 run_checked route-camera --script res://tests/routes/board_smoke.gd
 run_checked route-loop --script res://tests/routes/scene_smoke.gd

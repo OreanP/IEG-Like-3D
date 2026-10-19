@@ -26,3 +26,31 @@ blender --background --python tools/art/build_spirits.py
 
 Blender sert uniquement à produire les assets hors jeu. Le jeu utilise Godot
 standard et GDScript ; le rendu est compatible avec le moteur Compatibility.
+
+## Vaélis et Orvann
+
+Deux modèles originaux supplémentaires, sans texture ni extraction externe :
+
+- **Vaélis** : masque blanc de renard avec museau et oreilles sculptés, armure
+  indigo gravée d'or, doigts à griffes, bottes et neuf queues épaisses courbes,
+  translucides et terminées par des pointes dorées. 16 maillages, 27 660 triangles.
+- **Orvann** : cerf de pierre claire, nasal allongé, bois géométriques ramifiés,
+  épaulières en tours crénelées, gantelets-bastions, cuivre et gravures de jade.
+  9 maillages, 23 672 triangles.
+
+Ces budgets comptent la géométrie GLB détaillée ; Godot génère également ses
+niveaux de détail à l'importation. Chaque modèle conserve les pivots `Head`,
+`ArmLeft`, `ArmRight`, `LegLeft`, `LegRight`, et `Core`. Vaélis ajoute `Tail0` à
+`Tail8` ; Orvann ajoute `AntlerLeft` et `AntlerRight`.
+
+Leurs poses d'invocation, respiration et signature sont déterministes dans
+`modifier_visual.gd`. L'issue ne modifie la pose qu'après la révélation des
+scores. Les palettes `Primary`, `Trim`, `Light`, `Dark`, `Glass` sont appliquées
+au chargement ; le masque blanc de Vaélis conserve sa couleur de matériau.
+
+```sh
+blender --background --python tools/art/build_new_spirits.py
+```
+
+Cet outil réutilise les primitives de `build_spirits.py` comme bibliothèque,
+sans exécuter ses exports ni écraser Astreion ou Thalassa.

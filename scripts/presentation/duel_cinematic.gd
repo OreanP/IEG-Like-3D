@@ -6,6 +6,7 @@ extends Node3D
 const ModifierVisual = preload("res://scripts/presentation/modifier_visual.gd")
 const BallScene = preload("res://assets/ball/football.glb")
 const ENERGY_SHELL = preload("res://assets/vfx/energy_shell.gdshader")
+const Choreography = preload("res://scripts/presentation/technique_choreography.gd")
 
 signal reveal
 signal finished
@@ -29,10 +30,12 @@ var _axis: Vector3
 var _side: Vector3
 var _impact: MeshInstance3D
 var _floor_ring: MeshInstance3D
+var _choreography: RefCounted = Choreography.new()
 
 func begin(duel: Dictionary, attacker: Node3D, defender: Node3D, ball: Node3D) -> void:
     stop()
     duel_data = duel.duplicate(true)
+    _choreography.host = self
     duration = maxf(1.0, float(duel.get("duration", duration)))
     reveal_time = clampf(float(duel.get("reveal_time", reveal_time)), 0.2, duration - 0.2)
     elapsed = 0.0
@@ -253,6 +256,22 @@ func _render() -> void:
                 4.2 - windup * 1.5 if effect.id == "perihelion_hammer" else -5.0 + windup * 2.0)
             _camera.look_at(_stage.to_global(Vector3(0, 1.8, 0.4)), Vector3.UP)
             _camera.fov = 49.0
+    # Les profils de la nouvelle collection cadrent leurs vrais volumes et appuis.
+    # Une signature conserve le plan large même face à une défense ordinaire.
+    var profile: Dictionary = {}
+    var signature_profile: bool = false
+    for effect: Dictionary in _fx:
+        if not _choreography.handles(str(effect.id)):
+            continue
+        var signature_effect: bool = str(effect.id) in ["ninefold_hunt", "antler_citadel"]
+        if signature_profile and not signature_effect:
+            continue
+        profile = _choreography.camera(effect, windup, aftermath)
+        signature_profile = signature_effect
+    if not profile.is_empty():
+        _camera.position = profile.position
+        _camera.look_at(_stage.to_global(profile.target), Vector3.UP)
+        _camera.fov = float(profile.fov)
 
 func _position_actor(index: int, point: Vector3, facing: Vector3, roll: float, pitch: float) -> void:
     if index >= _actors.size() or not is_instance_valid(_actors[index].model):
@@ -285,13 +304,22 @@ func _create_technique(id: String, actor_index: int) -> void:
         "hurricane_barrier": Color("a3ffc0"), "aquablast": Color("50d9ff"),
         "combat_blade": Color("ff5b83"), "drift": Color("71ffe0"),
         "photo_stop": Color("fff7bd"), "gyroscopic_stop": Color("77b3ff"),
-        "perihelion_hammer": Color("eaa266"), "abyssal_cathedral": Color("5fe3df")}
+        "perihelion_hammer": Color("eaa266"), "abyssal_cathedral": Color("5fe3df"),
+        "seismic_strike": Color("ef925b"), "prism_ricochet": Color("9bcaff"),
+        "paper_escape": Color("e8e5b3"), "syncope": Color("61efcf"),
+        "bronze_rampart": Color("cda564"), "mechanical_brambles": Color("7bbab2"),
+        "titan_grip": Color("f0bb74"), "midnight_dial": Color("8cafff"),
+        "ninefold_hunt": Color("d6c99d"), "antler_citadel": Color("7ce2b7")}
     effect.color = colors.get(signature, Color("eee6cb"))
     if definition.get("color") is String and Color.html_is_valid(definition.color):
         effect.color = Color.html(definition.color)
     var power: float = float(definition.get("power", 30.0))
     var intensity: float = clampf(0.8 + power / 150.0, 0.8, 1.65) if is_finite(power) else 1.0
     root.scale = Vector3.ONE * intensity
+    if _choreography.handles(signature):
+        _choreography.build(effect, definition)
+        _fx.append(effect)
+        return
     match signature:
         "perihelion_hammer", "abyssal_cathedral":
             var spirit: Node3D = ModifierVisual.new()
@@ -355,7 +383,11 @@ func _effect_signature(effect: String, fallback: String) -> String:
     var aliases: Dictionary = {"orbital": "orbital_shot", "magnus": "magnus_shot",
         "hurricane": "hurricane_barrier", "aqua": "aquablast", "blade": "combat_blade",
         "drift": "drift", "photo": "photo_stop", "gyro": "gyroscopic_stop",
-        "perihelion": "perihelion_hammer", "abyssal": "abyssal_cathedral"}
+        "perihelion": "perihelion_hammer", "abyssal": "abyssal_cathedral",
+        "seismic": "seismic_strike", "prism": "prism_ricochet", "paper": "paper_escape",
+        "syncope": "syncope", "bronze": "bronze_rampart", "brambles": "mechanical_brambles",
+        "titan": "titan_grip", "midnight": "midnight_dial", "ninefold": "ninefold_hunt",
+        "citadel": "antler_citadel"}
     if aliases.has(effect):
         return aliases[effect]
     if effect in aliases.values():
@@ -363,6 +395,9 @@ func _effect_signature(effect: String, fallback: String) -> String:
     return fallback
 
 func _animate_technique(effect: Dictionary, charge: float, after: float) -> void:
+    if _choreography.handles(str(effect.id)):
+        _choreography.animate(effect, charge, after)
+        return
     var root: Node3D = effect.root
     var pieces: Array = effect.pieces
     var id: String = effect.id

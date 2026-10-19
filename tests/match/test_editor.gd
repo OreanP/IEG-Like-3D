@@ -14,7 +14,9 @@ func run_all() -> Dictionary:
         _duplicate_karma_clones_signature, _duplicate_karma_save_roundtrip, _duplicate_twice_keeps_unique_ids,
         _duplicate_signature_remains_linked, _duplicate_resonance_is_independent,
         _save_reload_restore, _invalid_graph_preserves_saved_file,
-        _embedded_return, _unsaved_edits_block_return]
+        _embedded_return, _unsaved_edits_block_return, _new_content_resource_fields,
+        _new_technique_shared_preview, _new_guardian_three_outcomes, _new_defensive_preview,
+        _new_karma_copy_palette_and_signature]
     var lines: Array[String] = []
     var passed: int = 0
     for test: Callable in cases:
@@ -239,3 +241,106 @@ func _unsaved_edits_block_return() -> bool:
     _editor._fields["name"].text_changed.emit("Essai")
     _editor._open_match()
     return _editor._dirty and not result["called"]
+
+func _new_content_resource_fields() -> bool:
+    for data: Array in [["vaelis", 210.0, 95.0, "azur_08"], ["orvann", 260.0, 80.0, "azur_04"]]:
+        if not _select(str(data[0])) or _editor._mechanic_fields["pg_max"].value != data[1] or _editor._mechanic_fields["pe_max"].value != data[2] or _editor._mechanic_fields["owner_keys"].text != data[3]:
+            return false
+    for id: String in ["ninefold_hunt", "antler_citadel"]:
+        if not _select(id) or not _editor._mechanic_sections["SIGNATURE"].visible:
+            return false
+    return not _editor._dirty
+
+func _new_technique_shared_preview() -> bool:
+    for id: String in ["seismic_strike", "prism_ricochet", "paper_escape", "syncope", "bronze_rampart", "mechanical_brambles", "titan_grip", "midnight_dial", "ninefold_hunt", "antler_citadel"]:
+        if not _select(id):
+            return false
+        var cinematic: IEGDuelCinematic = _editor._preview._cinematic
+        if not cinematic.active or cinematic._fx.is_empty() or cinematic._fx[0].technique_id != id or cinematic._fx[0].id != id:
+            return false
+        var keeper: bool = _entry().category == "GAR"
+        if _editor._preview_outcome.visible != keeper or _editor._preview_result.visible == keeper:
+            return false
+        if not is_equal_approx(cinematic.duration, float(_entry().duration)):
+            return false
+    return true
+
+func _new_guardian_three_outcomes() -> bool:
+    for id: String in ["titan_grip", "midnight_dial"]:
+        if not _select(id):
+            return false
+        for index: int in range(3):
+            _editor._preview_outcome.select(index)
+            _editor._sync_preview_outcome(_entry())
+            var result: Dictionary = _editor._preview._cinematic.duel_data
+            var expected: String = ["capture", "deflection", "goal"][index]
+            if result.outcome != expected or result.defend_technique != id or result.kind != "keeper":
+                return false
+            var margin: float = float(result.defend_score) - float(result.attack_score)
+            if expected == "deflection" and (margin < 0.0 or margin >= 8.0):
+                return false
+    return true
+
+func _new_defensive_preview() -> bool:
+    for id: String in ["bronze_rampart", "antler_citadel"]:
+        if not _select(id):
+            return false
+        for failed: bool in [false, true]:
+            _editor._preview_result.select(1 if failed else 0)
+            _editor._sync_preview_outcome(_entry())
+            var result: Dictionary = _editor._preview._cinematic.duel_data
+            if result.kind != "block" or result.outcome != ("shot_continues" if failed else "block"):
+                return false
+            if result.attack_technique != "" or result.defend_technique != id:
+                return false
+    return true
+
+func _new_karma_copy_palette_and_signature() -> bool:
+    for id: String in ["vaelis", "orvann"]:
+        if not _select(id):
+            return false
+        var field: LineEdit = _editor._mechanic_fields["appearance.primary"]
+        field.text = "#1d3459"
+        field.text_changed.emit(field.text)
+        var accent: LineEdit = _editor._mechanic_fields["appearance.accent"]
+        accent.text = "#e9bd61"
+        accent.text_changed.emit(accent.text)
+        _editor._mechanic_fields["appearance.height"].value = 4.6
+        _editor._duplicate_entry()
+        var karma: Dictionary = _entry().duplicate(true)
+        if karma.id == id:
+            return false
+        _editor._save()
+        _editor._reload()
+        if _editor._dirty or not _select(str(karma.properties.signature_id)):
+            return false
+        var signature: Dictionary = _entry()
+        if signature.properties.karma_id != karma.id:
+            return false
+        var cinematic: IEGDuelCinematic = _editor._preview._cinematic
+        if cinematic._fx.is_empty() or not cinematic._fx[0].get("parts", {}).has("spirit"):
+            return false
+        var spirit: Node3D = cinematic._fx[0].parts.spirit
+        var appearance: Dictionary = spirit.definition.get("properties", {}).get("appearance", {})
+        if appearance.get("style", "") != id or appearance.get("primary", "") != "#1d3459" or appearance.get("accent", "") != "#e9bd61":
+            return false
+        if not spirit._primary.is_equal_approx(Color("#1d3459")) or not spirit._color.is_equal_approx(Color("#e9bd61")) or not is_equal_approx(float(spirit._height_scale), 1.15) or not _preview_contains_color(spirit, Color("#1d3459")):
+            return false
+        var linked_karma: Dictionary = {}
+        for data: Dictionary in cinematic.duel_data.techniques:
+            if str(data.id) == str(karma.id):
+                linked_karma = data
+        if linked_karma.is_empty() or linked_karma.properties.appearance.primary != "#1d3459":
+            return false
+    return true
+
+func _preview_contains_color(node: Node, expected: Color) -> bool:
+    if node is MeshInstance3D and node.mesh != null:
+        for surface: int in node.mesh.get_surface_count():
+            var material: Material = node.get_active_material(surface)
+            if material is StandardMaterial3D and material.albedo_color.is_equal_approx(expected):
+                return true
+    for child: Node in node.get_children():
+        if _preview_contains_color(child, expected):
+            return true
+    return false

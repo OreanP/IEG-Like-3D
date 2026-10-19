@@ -17,6 +17,8 @@ var _list: ItemList
 var _fields: Dictionary = {}
 var _status: Label
 var _preview: SubViewportContainer
+var _preview_outcome: OptionButton
+var _preview_result: OptionButton
 var _restore_dialog: ConfirmationDialog
 var _reload_dialog: ConfirmationDialog
 var _mechanic_fields: Dictionary = {}
@@ -191,12 +193,19 @@ func _build_ui() -> void:
     hero.add_child(preview_controls)
     _add_button(preview_controls, "↻  Rejouer", _replay_preview)
     var outcome: OptionButton = OptionButton.new()
+    _preview_outcome = outcome
     outcome.name = "KeeperOutcome"
     for label: String in ["Issue GAR : capture", "Issue GAR : déviation", "Issue GAR : échec"]:
         outcome.add_item(label)
     outcome.item_selected.connect(func(index: int) -> void:
         _preview.set_outcome(["capture", "deflection", "goal"][index]))
     preview_controls.add_child(outcome)
+    _preview_result = OptionButton.new()
+    _preview_result.name = "TechniqueOutcome"
+    _preview_result.add_item("Issue : réussite")
+    _preview_result.add_item("Issue : échec")
+    _preview_result.item_selected.connect(func(index: int) -> void: _preview.set_failure(index == 1))
+    preview_controls.add_child(_preview_result)
     var parameters: VBoxContainer = _card(editor, "Parameters", 16)
     _section_heading(parameters, "01", "Identité & équilibre")
     var grid: GridContainer = GridContainer.new()
@@ -321,6 +330,7 @@ func _build_mechanic_fields(parent: Node) -> void:
     _add_property_number(karma, "PG perdus si défaite", "defeat_pg_cost", 0.0, 1000.0)
     _add_property_choice(karma, "Technique exclusive", "signature_id")
     _add_property_list(karma, "Propriétaires (clés séparées par ,)", "owner_keys")
+    _add_property_number(karma, "Hauteur du Karma (m)", "appearance.height", 0.8, 12.0)
     for key: String in STAT_LABELS:
         _add_property_number(karma, "Bonus " + String(STAT_LABELS[key]), "stat_bonuses." + key, 0.0, 100.0)
     var signature: GridContainer = _mechanic_section(parent, "SIGNATURE", "Technique exclusive — réservée à son Karma")
@@ -626,7 +636,14 @@ func _update_identity(entry: Dictionary) -> void:
                 inherited.append(str(_find_definition(str(id)).get("name", id)))
             _entry_summary.text = "%s  •  %s s  •  %s" % [props.get("donor_key", "Donneur"), entry.get("duration", 0), " + ".join(inherited)]
         _:
-            _entry_summary.text = "Puissance %s  •  Endurance %s  •  %s" % [entry.get("power", 0), entry.get("cost", 0), "Technique exclusive" if props.has("karma_id") else "Technique de match"]
+            if props.has("karma_id"):
+                var owner: Dictionary = _find_definition(str(props["karma_id"]))
+                _entry_summary.text = "Puissance %s  •  %s PG / %s PE  •  %s" % [entry.get("power", 0), props.get("pg_cost", 0), props.get("pe_cost", 0), owner.get("name", "Technique exclusive")]
+            else:
+                _entry_summary.text = "Puissance %s  •  Endurance %s  •  %s" % [entry.get("power", 0), entry.get("cost", 0), "Blocage de tir" if bool(props.get("block", false)) else "Technique de match"]
+    var category: String = str(entry["category"])
+    _preview_outcome.visible = category == "GAR"
+    _preview_result.visible = category in ["TIR", "ATT", "DEF"]
 
 func _show_entry(index: int) -> void:
     if index < 0 or index >= _entries.size():
@@ -648,7 +665,9 @@ func _show_entry(index: int) -> void:
         _list.select(visible_index)
         _list.ensure_current_is_visible()
     _update_identity(entry)
+    _preview.set_catalog_definitions(_entries)
     _preview.set_definition(entry)
+    _sync_preview_outcome(entry)
 
 func _try_apply_edits() -> bool:
     if _selected < 0:
@@ -700,12 +719,22 @@ func _mark_dirty() -> void:
 
 func _apply_preview() -> void:
     if _try_apply_edits():
+        _preview.set_catalog_definitions(_entries)
         _preview.set_definition(_entries[_selected])
+        _sync_preview_outcome(_entries[_selected])
         _set_status("Fiche valide. Sauvegardez pour appliquer ces valeurs aux prochains matchs.")
 
 func _replay_preview() -> void:
     if _try_apply_edits():
+        _preview.set_catalog_definitions(_entries)
         _preview.set_definition(_entries[_selected])
+        _sync_preview_outcome(_entries[_selected])
+
+func _sync_preview_outcome(entry: Dictionary) -> void:
+    if str(entry.get("category", "")) == "GAR":
+        _preview.set_outcome(["capture", "deflection", "goal"][_preview_outcome.selected])
+    else:
+        _preview.set_failure(_preview_result.selected == 1)
 
 func _save() -> void:
     if not _try_apply_edits():

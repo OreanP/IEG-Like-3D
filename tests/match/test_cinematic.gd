@@ -11,7 +11,9 @@ const Roster = preload("res://scripts/match/match_roster.gd")
 const Command = preload("res://core/game_command.gd")
 const Rules = preload("res://core/training_rules.gd")
 const IDS: Array[String] = ["orbital_shot", "magnus_shot", "combat_blade", "drift",
-    "hurricane_barrier", "aquablast", "photo_stop", "gyroscopic_stop", "perihelion_hammer", "abyssal_cathedral"]
+    "hurricane_barrier", "aquablast", "photo_stop", "gyroscopic_stop", "perihelion_hammer", "abyssal_cathedral",
+    "seismic_strike", "prism_ricochet", "paper_escape", "syncope", "bronze_rampart",
+    "mechanical_brambles", "titan_grip", "midnight_dial", "ninefold_hunt", "antler_citadel"]
 var _total: int = 0
 var _passed: int = 0
 var _lines: Array[String] = []
@@ -29,9 +31,10 @@ func run_all() -> Dictionary:
         return _report()
     for id: String in IDS:
         _technique_lifecycle(context, id)
-    for id: String in ["photo_stop", "gyroscopic_stop", "abyssal_cathedral"]:
+    for id: String in ["photo_stop", "gyroscopic_stop", "abyssal_cathedral", "titan_grip", "midnight_dial"]:
         _keeper_branches(context, id)
     _catalogue_overrides(context)
+    _new_effect_clones(context)
     _cancellation(context)
     _shot_block(context)
     _simulation_contracts()
@@ -68,8 +71,10 @@ func _fixture() -> Dictionary:
         "defender": defender, "ball": ball, "camera": camera, "cinematic": cinematic}
 
 func _result(id: String, outcome: String = "") -> Dictionary:
-    var defending: bool = id in ["hurricane_barrier", "aquablast", "photo_stop", "gyroscopic_stop", "abyssal_cathedral"]
-    var keeper: bool = id in ["photo_stop", "gyroscopic_stop", "orbital_shot", "magnus_shot", "perihelion_hammer", "abyssal_cathedral"]
+    var catalog: IEGTechniqueCatalog = Catalog.new("user://test_cinematic_definitions_unused_%d.json" % OS.get_process_id())
+    var category: String = str(catalog.get_definition(id).get("category", ""))
+    var defending: bool = category in ["DEF", "GAR"]
+    var keeper: bool = category in ["TIR", "GAR"]
     var attack_won: bool = not defending
     if outcome in ["capture", "deflection"]:
         attack_won = false
@@ -81,7 +86,7 @@ func _result(id: String, outcome: String = "") -> Dictionary:
         "attack_technique": "" if defending else id, "defend_technique": id if defending else "",
         "attack_score": 140 if attack_won else 110, "defend_score": 110 if attack_won else 140,
         "winner_id": 7 if attack_won else 21, "attacker_won": attack_won,
-        "duration": 3.2, "reveal_time": 1.4,
+        "duration": 3.2, "reveal_time": 1.4, "techniques": catalog.all_definitions(),
         "outcome": outcome if not outcome.is_empty() else ("capture" if defending and keeper else "dribble")}
 
 func _begin(context: Dictionary, result: Dictionary) -> void:
@@ -279,7 +284,7 @@ func _report() -> Dictionary:
 
 func _modifier_presentation(context: Dictionary) -> void:
     var catalog: IEGTechniqueCatalog = Catalog.new("user://cinematic_catalogue_unused.json")
-    for id: String in ["astreion", "thalassa", "sovereign_orbit", "deep_watch"]:
+    for id: String in ["astreion", "thalassa", "vaelis", "orvann", "sovereign_orbit", "deep_watch"]:
         var visual: Node3D = ModifierVisual.new()
         context.root.add_child(visual)
         var definition: Dictionary = catalog.get_definition(id)
@@ -332,14 +337,66 @@ func _modifier_presentation(context: Dictionary) -> void:
     view.sync_modifier_visuals([], 0.0)
     _check(view.get("_modifier_views").is_empty() and _actors_snapshot(context) == actor_before,
         "fin des transformations : accessoires retirés, modèle et matériaux originaux intacts")
+    _invocation_time_origin(view, catalog)
     var preview: SubViewportContainer = Preview.new()
     context.viewport.add_child(preview)
     preview.set_process(false)
-    for id: String in ["astreion", "thalassa", "sovereign_orbit", "deep_watch", "perihelion_hammer", "abyssal_cathedral"]:
+    for id: String in ["astreion", "thalassa", "vaelis", "orvann", "sovereign_orbit", "deep_watch", "perihelion_hammer", "abyssal_cathedral", "ninefold_hunt", "antler_citadel"]:
         preview.set_definition(catalog.get_definition(id))
         preview.set_outcome("deflection")
         preview._process(1.0)
         _check(preview.get("_modifier").visible and preview.get("_modifier").find_child("SpiritBody", true, false) != null
-            if id in ["astreion", "thalassa", "perihelion_hammer", "abyssal_cathedral"] else preview.get("_modifier").visible,
+            if id in ["astreion", "thalassa", "vaelis", "orvann", "perihelion_hammer", "abyssal_cathedral", "ninefold_hunt", "antler_citadel"] else preview.get("_modifier").visible,
             id + " : aperçu atelier rendu et sélection de l'issue disponibles")
     preview.queue_free()
+
+func _invocation_time_origin(view: IEGPlayerView, catalog: IEGTechniqueCatalog) -> void:
+    view.sync_modifier_visuals([], 42.0)
+    var entries: Array[Dictionary] = [catalog.get_definition("vaelis")]
+    view.sync_modifier_visuals(entries, 0.0)
+    var spirit: Node3D = view._modifier_views["vaelis"]
+    _check(is_zero_approx(float(spirit._time)), "invocation tardive : Vaélis commence à zéro après 42 secondes sans aura")
+    view.sync_modifier_visuals(entries, 0.3)
+    var elapsed: float = float(spirit._time)
+    view.sync_modifier_visuals(entries, 0.0)
+    _check(is_equal_approx(elapsed, 0.3) and is_equal_approx(float(spirit._time), elapsed),
+        "invocation : le delta avance la présentation et une pause conserve son temps")
+    entries[0].properties.appearance.height = 4.3
+    entries[0].properties.appearance.primary = "#243865"
+    view.sync_modifier_visuals(entries, 0.0)
+    _check(is_equal_approx(float(spirit._time), elapsed), "édition d'une invocation active : palette et hauteur ne rembobinent pas son animation")
+    view.sync_modifier_visuals([], 0.0)
+    view.sync_modifier_visuals(entries, 0.2)
+    _check(is_zero_approx(float(view._modifier_views["vaelis"]._time)), "réinvocation : un nouveau cycle visuel commence à zéro")
+    view.sync_modifier_visuals([], 0.0)
+
+func _new_effect_clones(context: Dictionary) -> void:
+    var catalog: IEGTechniqueCatalog = Catalog.new("user://test_cinematic_clone_unused_%d.json" % OS.get_process_id())
+    for id: String in ["seismic_strike", "prism_ricochet", "paper_escape", "syncope", "bronze_rampart", "mechanical_brambles", "titan_grip", "midnight_dial", "ninefold_hunt", "antler_citadel"]:
+        var cloned: Dictionary = catalog.get_definition(id)
+        cloned.id = id + "_copy"
+        cloned.color = "#e63f92"
+        var result: Dictionary = _result(id)
+        var defending: bool = cloned.category in ["DEF", "GAR"]
+        result["defend_technique" if defending else "attack_technique"] = cloned.id
+        result.techniques.append(cloned)
+        _begin(context, result)
+        var effects: Array = context.cinematic._fx
+        var resolved: bool = not effects.is_empty() and effects[0].id == id and effects[0].technique_id == cloned.id
+        _check(resolved, id + " : une copie personnalisée retrouve sa chorégraphie par effect")
+        _check(resolved and effects[0].color.is_equal_approx(Color("#e63f92"))
+            and _contains_color(effects[0].root, Color("#e63f92")),
+            id + " : la couleur éditée de la copie apparaît dans les matériaux du vrai duel")
+        context.cinematic.stop()
+
+func _contains_color(node: Node, color: Color) -> bool:
+    if node is MeshInstance3D:
+        var material: Material = node.material_override
+        if material is StandardMaterial3D:
+            var actual: Color = material.albedo_color
+            if is_equal_approx(actual.r, color.r) and is_equal_approx(actual.g, color.g) and is_equal_approx(actual.b, color.b):
+                return true
+    for child: Node in node.get_children():
+        if _contains_color(child, color):
+            return true
+    return false

@@ -7,6 +7,8 @@ extends Node3D
 
 const ASTREION_MODEL: PackedScene = preload("res://assets/karma/astreion.glb")
 const THALASSA_MODEL: PackedScene = preload("res://assets/karma/thalassa.glb")
+const VAELIS_MODEL: PackedScene = preload("res://assets/karma/vaelis.glb")
+const ORVANN_MODEL: PackedScene = preload("res://assets/karma/orvann.glb")
 
 var style: String = ""
 var definition: Dictionary = {}
@@ -20,6 +22,10 @@ var _pillars: Array[MeshInstance3D] = []
 var _arches: Array[MeshInstance3D] = []
 var _core: MeshInstance3D
 var _hammer: Node3D
+var _head: Node3D
+var _legs: Array[Node3D] = []
+var _tails: Array[Node3D] = []
+var _antlers: Array[Node3D] = []
 var _primary: Color
 var _color: Color
 var _time: float = 0.0
@@ -41,38 +47,58 @@ func configure(source: Dictionary) -> void:
     _arches.clear()
     _core = null
     _hammer = null
+    _head = null
+    _legs.clear()
+    _tails.clear()
+    _antlers.clear()
     _palette.clear()
     var props: Dictionary = definition.get("properties", {})
     var appearance: Dictionary = props.get("appearance", {})
     style = str(appearance.get("style", props.get("preview", definition.get("id", ""))))
     var effect: String = str(definition.get("effect", ""))
-    _signature = effect in ["perihelion", "abyssal"] or str(definition.get("id", "")) in ["perihelion_hammer", "abyssal_cathedral"]
+    _signature = effect in ["perihelion", "abyssal", "ninefold", "citadel"] or str(definition.get("id", "")) in ["perihelion_hammer", "abyssal_cathedral", "ninefold_hunt", "antler_citadel"]
     if effect == "perihelion" or style == "perihelion_hammer":
         style = "astreion"
     elif effect == "abyssal" or style == "abyssal_cathedral":
         style = "thalassa"
+    elif effect == "ninefold" or style == "ninefold_hunt":
+        style = "vaelis"
+    elif effect == "citadel" or style == "antler_citadel":
+        style = "orvann"
+    elif effect in ["vaelis", "orvann"]:
+        style = effect
     if style in ["soren", "soren_vale", "orbite_souveraine"]:
         style = "sovereign_orbit"
     elif style in ["maelle", "maelle_neris", "vigie_des_profondeurs"]:
         style = "deep_watch"
     _color = Color("f5a251") if style in ["astreion", "sovereign_orbit"] else Color("56e5dc")
+    if style == "vaelis":
+        _color = Color("f5cd7c")
+    elif style == "orvann":
+        _color = Color("92d69d")
     if Color.html_is_valid(str(definition.get("color", ""))):
         _color = Color.html(str(definition.color))
     # La palette d'apparence prime ; la couleur générale reste le repli des anciens contenus.
     if Color.html_is_valid(str(appearance.get("accent", ""))):
         _color = Color.html(str(appearance.accent))
     _primary = Color("17263f") if style == "astreion" else Color("163c5b")
+    if style == "vaelis":
+        _primary = Color("272653")
+    elif style == "orvann":
+        _primary = Color("e3ddc8")
     if Color.html_is_valid(str(appearance.get("primary", ""))):
         _primary = Color.html(str(appearance.primary))
     var height: Variant = appearance.get("height", 4.0)
     var safe_height: float = float(height) if height is float or height is int else 4.0
-    _height_scale = clampf(safe_height / 4.0, 0.25, 3.0) if style in ["astreion", "thalassa"] and is_finite(safe_height) else 1.0
+    _height_scale = clampf(safe_height / 4.0, 0.25, 3.0) if style in ["astreion", "thalassa", "vaelis", "orvann"] and is_finite(safe_height) else 1.0
     _body = Node3D.new()
-    _body.name = "SpiritBody" if style in ["astreion", "thalassa"] else "ResonanceMarks"
+    _body.name = "SpiritBody" if style in ["astreion", "thalassa", "vaelis", "orvann"] else "ResonanceMarks"
     add_child(_body)
     match style:
         "astreion": _build_astreion()
         "thalassa": _build_thalassa()
+        "vaelis": _build_vaelis()
+        "orvann": _build_orvann()
         "sovereign_orbit", "deep_watch": _build_resonance()
         _: _build_fallback()
     set_presentation(0.0)
@@ -105,6 +131,7 @@ func set_presentation(time: float, intensity: float = 1.0, _outcome: String = ""
         pillar.visible = false
     for arch: MeshInstance3D in _arches:
         arch.visible = false
+    _animate_new_spirit(time)
 
 func set_signature_progress(charge: float, after: float, outcome: String = "") -> void:
     # L'issue ne sert qu'après charge=1, donc préparation commune aux trois fins.
@@ -143,6 +170,10 @@ func set_signature_progress(charge: float, after: float, outcome: String = "") -
             arch.scale = Vector3.ONE * (charge_amount * (1 - capture * 0.44) + failure * 0.4)
             arch.rotation = Vector3(PI * 0.5 + failure * index * 0.4, failure * index * 0.3, parry * 0.4)
         _body.rotation.x = -failure * 0.18
+    elif style == "vaelis":
+        _pose_vaelis_signature(charge_amount, after_amount, outcome)
+    elif style == "orvann":
+        _pose_orvann_signature(charge_amount, after_amount, outcome)
 
 func _build_astreion() -> void:
     _create_palette()
@@ -182,6 +213,111 @@ func _build_thalassa() -> void:
     for index: int in 3:
         _arches.append(_ring(_body, Vector3.ZERO, 1.45 + index * 0.08, _palette.Light))
 
+func _build_vaelis() -> void:
+    _create_palette()
+    var model: Node3D = VAELIS_MODEL.instantiate()
+    _take_part(model, "BodyArmor", _body)
+    _core = _take_part(model, "Core", _body) as MeshInstance3D
+    _head = _take_part(model, "Head", _body)
+    for part_name: String in ["ArmLeft", "ArmRight"]:
+        _arms.append(_take_part(model, part_name, _body))
+    for part_name: String in ["LegLeft", "LegRight"]:
+        _legs.append(_take_part(model, part_name, _body))
+    for index: int in 9:
+        _tails.append(_take_part(model, "Tail%d" % index, _body))
+    model.free()
+
+func _build_orvann() -> void:
+    _create_palette()
+    var model: Node3D = ORVANN_MODEL.instantiate()
+    _take_part(model, "BodyArmor", _body)
+    _core = _take_part(model, "Core", _body) as MeshInstance3D
+    _head = _take_part(model, "Head", _body)
+    for part_name: String in ["ArmLeft", "ArmRight"]:
+        _arms.append(_take_part(model, part_name, _body))
+    for part_name: String in ["LegLeft", "LegRight"]:
+        _legs.append(_take_part(model, part_name, _body))
+    for part_name: String in ["AntlerLeft", "AntlerRight"]:
+        _antlers.append(_take_part(model, part_name, _body))
+    model.free()
+
+func _animate_new_spirit(time: float) -> void:
+    if style not in ["vaelis", "orvann"]:
+        return
+    # L'horloge fournie est l'unique source de mouvement : aucun Tween ou timer
+    # ne continue pendant les pauses. La même valeur reproduit la même pose.
+    var summon: float = smoothstep(0.0, 0.85, maxf(0, time))
+    if style == "vaelis":
+        _body.position.y = sin(time * 2.4) * 0.035 - (1 - summon) * 0.12
+        _body.rotation.y = sin(time * 0.65) * 0.07
+        if _head != null:
+            _head.rotation = Vector3(-0.07, sin(time * 0.8) * 0.09, sin(time * 1.1) * 0.025)
+        for index: int in _legs.size():
+            var side: float = -1.0 if index == 0 else 1.0
+            _legs[index].rotation = Vector3(sin(time * 1.2 + index * PI) * 0.025, 0, side * 0.075)
+        for index: int in _arms.size():
+            var side: float = -1.0 if index == 0 else 1.0
+            _arms[index].rotation = Vector3(-0.15 + sin(time * 1.5 + index) * 0.025, 0, side * 0.28)
+        for index: int in _tails.size():
+            var side: float = (index - 4) / 4.0
+            _tails[index].rotation = Vector3(sin(time * 1.1 + index * 0.48) * 0.12,
+                sin(time * 0.7 + index * 0.5) * 0.075,
+                (1 - summon) * side * 0.5 + sin(time * 1.3 + index * 0.52) * 0.045)
+    else:
+        _body.position.y = sin(time * 1.25) * 0.018
+        if _head != null:
+            _head.rotation = Vector3(-0.045 + sin(time * 0.75) * 0.015, sin(time * 0.4) * 0.04, 0)
+        for index: int in _legs.size():
+            var side: float = -1.0 if index == 0 else 1.0
+            _legs[index].rotation = Vector3(0.02, 0, side * 0.07)
+        for index: int in _arms.size():
+            var side: float = -1.0 if index == 0 else 1.0
+            _arms[index].rotation = Vector3(-0.06 + sin(time * 1.25) * 0.014, 0, side * 0.15)
+        for index: int in _antlers.size():
+            var side: float = -1.0 if index == 0 else 1.0
+            _antlers[index].rotation = Vector3(0, 0, side * (1 - summon) * 0.13)
+            _antlers[index].scale = Vector3(1, 0.32 + 0.68 * summon, 1)
+
+func _pose_vaelis_signature(charge: float, after: float, outcome: String) -> void:
+    var failure: float = after if outcome in ["failure", "loss", "tackled", "tackle"] else 0.0
+    var escape: float = after if outcome in ["success", "win", "dribbled", "dribble"] else 0.0
+    var crouch: float = sin(charge * PI)
+    _body.position.y -= crouch * 0.22 + failure * 0.14
+    _body.rotation = Vector3(-crouch * 0.10 + failure * 0.15, -crouch * 0.22 + escape * 0.30, -escape * 0.09)
+    if _head != null:
+        _head.rotation = Vector3(-0.10 + failure * 0.25, crouch * 0.20, 0)
+    for index: int in _arms.size():
+        var side: float = -1.0 if index == 0 else 1.0
+        _arms[index].rotation = Vector3(-0.25 - crouch * 0.35 + escape * 0.2,
+            side * crouch * 0.3, side * (0.3 + charge * 0.45 - failure * 0.3))
+    for index: int in _legs.size():
+        var side: float = -1.0 if index == 0 else 1.0
+        _legs[index].rotation = Vector3(side * (crouch * 0.20 - escape * 0.15), 0, side * (0.08 + crouch * 0.08))
+    for index: int in _tails.size():
+        var side: float = (index - 4) / 4.0
+        _tails[index].rotation = Vector3(-charge * 0.32 + sin(charge * PI * 2 + index * 0.7) * 0.10,
+            side * charge * 0.18 + escape * 0.25,
+            side * (crouch * 0.25 - escape * 0.14 + failure * 0.30))
+
+func _pose_orvann_signature(charge: float, after: float, outcome: String) -> void:
+    var failure: float = after if outcome in ["failure", "loss", "goal", "shot_continues"] else 0.0
+    var brace: float = smoothstep(0.15, 0.85, charge)
+    _body.position.y -= brace * 0.08
+    _body.rotation = Vector3(-brace * 0.12 + failure * 0.28, 0, failure * 0.08)
+    if _head != null:
+        _head.rotation = Vector3(-brace * 0.17 + failure * 0.25, 0, 0)
+    for index: int in _arms.size():
+        var side: float = -1.0 if index == 0 else 1.0
+        _arms[index].rotation = Vector3(-brace * 0.85 + failure * 0.6, side * brace * 0.20,
+            side * (0.15 + brace * 0.35 + failure * 0.30))
+    for index: int in _legs.size():
+        var side: float = -1.0 if index == 0 else 1.0
+        _legs[index].rotation = Vector3(brace * 0.07, 0, side * (0.07 + brace * 0.04))
+    for index: int in _antlers.size():
+        var side: float = -1.0 if index == 0 else 1.0
+        _antlers[index].scale = Vector3.ONE
+        _antlers[index].rotation = Vector3(-brace * 0.10, side * brace * 0.13, side * failure * 0.15)
+
 func _create_palette() -> void:
     var armor: StandardMaterial3D = _material(_primary, false)
     armor.metallic = 0.20
@@ -213,6 +349,21 @@ func _create_palette() -> void:
         glass.emission_enabled = true
         glass.emission = _color
         glass.emission_energy_multiplier = 0.55
+    if style == "vaelis":
+        trim.albedo_color = _color.darkened(0.12)
+        glass.albedo_color = Color(_primary.lightened(0.36), 0.58)
+        glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+        glass.metallic = 0.0
+        glass.emission_enabled = true
+        glass.emission = _primary.lightened(0.16)
+        glass.emission_energy_multiplier = 0.12
+        light.emission = _color.lightened(0.22)
+    elif style == "orvann":
+        # Copper remains a warm architectural counterpoint to editable jade light.
+        trim.albedo_color = Color("a36b42")
+        trim.metallic = 0.3
+        armor.roughness = 0.62
+        dark.albedo_color = _primary.darkened(0.72)
     _palette = {"Primary": armor, "Trim": trim, "Light": light, "Dark": dark, "Glass": glass}
 
 func _take_part(model: Node3D, part_name: String, parent: Node3D) -> Node3D:
