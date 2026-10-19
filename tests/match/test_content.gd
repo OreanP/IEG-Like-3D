@@ -61,11 +61,11 @@ func _default_values_valid() -> bool:
     for data: Dictionary in c.all_definitions():
         if not c.validate_definition(data).is_empty():
             return false
-    return c.all_definitions().size() >= 18
+    return c.all_definitions().size() == 30
 
 func _default_balanced_categories() -> bool:
     var c: IEGTechniqueCatalog = fixture()
-    var expected: Dictionary = {"TIR": 3, "ATT": 2, "DEF": 2, "GAR": 3}
+    var expected: Dictionary = {"TIR": 5, "ATT": 5, "DEF": 5, "GAR": 5}
     for category: String in expected:
         if c.definitions_for(category).size() != expected[category]:
             return false
@@ -86,7 +86,7 @@ func _deep_copy_list() -> bool:
     var entries: Array[Dictionary] = c.all_definitions()
     entries[0]["properties"]["spin"] = 999
     entries.clear()
-    return c.all_definitions().size() == 18 and c.get_definition("orbital_shot")["properties"]["spin"] == 2.8
+    return c.all_definitions().size() == 30 and c.get_definition("orbital_shot")["properties"]["spin"] == 2.8
 
 func _tactics_parameters() -> bool:
     var c: IEGTechniqueCatalog = fixture()
@@ -114,7 +114,7 @@ func _roundtrip_and_default_fallback() -> bool:
     if c.save_overrides([data]) != OK:
         return false
     var loaded: IEGTechniqueCatalog = fixture()
-    return loaded.last_errors.is_empty() and loaded.get_definition("drift")["power"] == 41.5 and loaded.get_definition("orbital_shot")["name"] == "Tir orbital" and loaded.all_definitions().size() == 18
+    return loaded.last_errors.is_empty() and loaded.get_definition("drift")["power"] == 41.5 and loaded.get_definition("orbital_shot")["name"] == "Tir orbital" and loaded.all_definitions().size() == 30
 
 func _invalid_save_preserves_file() -> bool:
     var c: IEGTechniqueCatalog = fixture()
@@ -139,7 +139,7 @@ func _custom_entry() -> bool:
     if c.save_overrides([data]) != OK:
         return false
     var loaded: IEGTechniqueCatalog = fixture()
-    return loaded.get_definition("custom_technique")["name"] == "Essai" and loaded.all_definitions().size() == 19
+    return loaded.get_definition("custom_technique")["name"] == "Essai" and loaded.all_definitions().size() == 31
 
 func _malformed_load_preserves_memory() -> bool:
     var c: IEGTechniqueCatalog = fixture()
@@ -187,11 +187,11 @@ func _reset() -> bool:
 func _unsupported_schema() -> bool:
     _write(JSON.stringify({"schema_version": 99, "entries": []}))
     var c: IEGTechniqueCatalog = fixture()
-    return not c.last_errors.is_empty() and c.all_definitions().size() == 18
+    return not c.last_errors.is_empty() and c.all_definitions().size() == 30
 
 func _empty_overrides() -> bool:
     var c: IEGTechniqueCatalog = fixture()
-    return c.save_overrides([]) == OK and fixture().all_definitions().size() == 18
+    return c.save_overrides([]) == OK and fixture().all_definitions().size() == 30
 
 func _strict_augmentation_validation() -> bool:
     var c: IEGTechniqueCatalog = fixture()
@@ -235,7 +235,7 @@ func _canonical_augmentation_names() -> bool:
         return false
     if c.get_definition("tempest_echo") != karma or not c.definitions_for("ECHO").is_empty():
         return false
-    return c.definitions_for("KARMA").size() == 3 and c.all_definitions().size() == 18
+    return c.definitions_for("KARMA").size() == 5 and c.all_definitions().size() == 30
 
 func _fixed_team_limits() -> bool:
     var c: IEGTechniqueCatalog = fixture()
@@ -318,7 +318,7 @@ func _migration_save_roundtrip() -> bool:
 func _legacy_alias_collision() -> bool:
     var c: IEGTechniqueCatalog = fixture()
     _write(JSON.stringify({"schema_version": 1, "entries": [_legacy_karma(c), c.get_definition("tempest_karma")]}))
-    return c.load_overrides() == ERR_INVALID_DATA and not c.last_errors.is_empty() and c.all_definitions().size() == 18
+    return c.load_overrides() == ERR_INVALID_DATA and not c.last_errors.is_empty() and c.all_definitions().size() == 30
 
 func _legacy_cannot_bypass_cap() -> bool:
     var legacy: Dictionary = _legacy_karma(fixture())

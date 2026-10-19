@@ -38,14 +38,20 @@ static func build() -> Dictionary:
                 profile.display_name = "Soren Vale"
                 profile.content_key = "soren_vale"
                 profile.base_stats = {"shot": 90.0, "dribble": 80.0, "technique": 85.0, "defense": 45.0, "keeper": 20.0}
-                profile.technique_ids = ["drift", "magnus_shot", "orbital_shot", "combat_blade"]
+                profile.technique_ids = ["drift", "magnus_shot", "orbital_shot", "combat_blade", "seismic_strike", "prism_ricochet"]
                 profile.karma_ids = ["astreion"]
             elif team == 0 and shirt == 1:
                 profile.display_name = "Maëlle Néris"
                 profile.content_key = "maelle_neris"
                 profile.base_stats = {"shot": 30.0, "dribble": 45.0, "technique": 80.0, "defense": 85.0, "keeper": 95.0}
-                profile.technique_ids = ["aquablast", "gyroscopic_stop", "photo_stop"]
+                profile.technique_ids = ["aquablast", "gyroscopic_stop", "photo_stop", "titan_grip", "midnight_dial"]
                 profile.karma_ids = ["thalassa"]
+            elif team == 0 and shirt == 8:
+                profile.technique_ids.append_array(["paper_escape", "syncope"])
+                profile.karma_ids = ["vaelis"]
+            elif team == 0 and shirt == 4:
+                profile.technique_ids.append_array(["bronze_rampart", "mechanical_brambles"])
+                profile.karma_ids = ["orvann"]
             profile.run_speed = 5.2 + float(index % 3) * 0.12
             profile.sprint_speed = 8.2 + float(index % 3) * 0.14
             profile.kit_color = Color("1675df") if team == 0 else Color("d93b4d")

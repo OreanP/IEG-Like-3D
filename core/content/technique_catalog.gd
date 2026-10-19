@@ -51,6 +51,22 @@ func definitions_for(category: String) -> Array[Dictionary]:
             result.append(definition)
     return result
 
+static func cinematic_timing(attack: Dictionary, defense: Dictionary = {}) -> Dictionary:
+    # Le match et les deux ateliers emploient le même moment de révélation.
+    # Une défense spéciale choisit son point de bifurcation avant l'attaque.
+    var longest: float = 0.0
+    for definition: Dictionary in [attack, defense]:
+        if not definition.is_empty():
+            longest = maxf(longest, float(definition.get("duration", 3.2)))
+    var seconds: float = clampf(longest if longest > 0.0 else 3.2, 1.8, 10.0)
+    var reveal_seconds: float = clampf(1.4, 0.7, seconds - 0.4)
+    for definition: Dictionary in [defense, attack]:
+        var properties: Dictionary = definition.get("properties", {})
+        if properties.has("branch_at"):
+            reveal_seconds = clampf(seconds * float(properties["branch_at"]), 0.7, seconds - 0.4)
+            break
+    return {"duration": seconds, "reveal_time": reveal_seconds}
+
 func validate_definition(data: Dictionary, references: Dictionary = {}) -> PackedStringArray:
     var errors: PackedStringArray = []
     if references.is_empty():
@@ -429,6 +445,30 @@ func _defaults() -> Array[Dictionary]:
         _definition("gyroscopic_stop", "Arrêt Gyroscopique", "GAR", 28.0, 19.0, 4.1, 0.0, "gyro", "#ffd76f",
             "Des anneaux stabilisent les bras du gardien. Réussite : ils absorbent la rotation. Échec : ils s'écartent sous l'impact.",
             {"capture": true, "success_animation": "gyro_lock", "failure_animation": "gyro_break", "branch_at": 0.58, "preview": "gyro"}),
+        _definition("seismic_strike", "Frappe sismique", "TIR", 36.0, 28.0, 3.8, 3.0, "seismic", "#ef9855",
+            "Un coup de talon soulève des plaques de roche autour du ballon. La frappe les pulvérise et propulse un noyau incandescent ; une onde circulaire accompagne l'impact.",
+            {"flight_arc": 2.0, "spin": 1.4, "preview": "seismic"}),
+        _definition("prism_ricochet", "Ricochet prismatique", "TIR", 29.0, 23.0, 3.9, 12.0, "prism", "#bb9cff",
+            "Trois prismes réfléchissent le ballon en trajectoires apparentes. Les reflets convergent vers le véritable tir avant l'affrontement avec le gardien. Une frappe technique de longue distance.",
+            {"long_range": true, "curve": 0.55, "flight_arc": 2.5, "preview": "prism"}),
+        _definition("paper_escape", "Échappée de papier", "ATT", 27.0, 19.0, 3.5, 0.0, "paper", "#f2e8c7",
+            "Des feuilles composent un leurre qui continue tout droit tandis que le porteur pivote et repart. En cas d'échec, le défenseur déchire la silhouette et récupère le ballon.",
+            {"dash": 2.4, "branch_at": 0.58, "preview": "paper"}),
+        _definition("syncope", "Syncope", "ATT", 31.0, 24.0, 3.4, 0.0, "syncope", "#f57cad",
+            "Deux appuis lents précèdent une accélération brutale. Trois impulsions lumineuses marquent le rythme ; elles se brisent si le défenseur anticipe le dernier départ.",
+            {"dash": 2.8, "branch_at": 0.58, "preview": "syncope"}),
+        _definition("bronze_rampart", "Rempart d’airain", "DEF", 33.0, 26.0, 3.8, 0.0, "bronze", "#d5a362",
+            "Trois boucliers de bronze s'imbriquent devant le défenseur. Les gravures s'illuminent puis la prise bloque le ballon ; un tir victorieux déforme et brise les boucliers.",
+            {"block": true, "pushback": 1.8, "branch_at": 0.58, "preview": "bronze"}),
+        _definition("mechanical_brambles", "Ronces mécaniques", "DEF", 28.0, 21.0, 3.6, 0.0, "brambles", "#a8d98b",
+            "Des segments métalliques articulés encadrent le ballon pendant l'intervention du pied. La cage se referme sur une récupération ; un dribble réussi fait sauter ses attaches.",
+            {"block": false, "pushback": 1.2, "branch_at": 0.58, "preview": "brambles"}),
+        _definition("titan_grip", "Poigne du titan", "GAR", 35.0, 28.0, 4.0, 0.0, "titan", "#d2b99a",
+            "Deux avant-bras de pierre reproduisent la prise du gardien. Après les scores, les mains amortissent une capture, une paume dévie le ballon ou les doigts se fissurent sous un tir victorieux.",
+            {"capture": true, "branch_at": 0.58, "success_animation": "titan_capture", "parry_animation": "titan_parry", "failure_animation": "titan_fracture", "preview": "titan"}),
+        _definition("midnight_dial", "Cadran de minuit", "GAR", 30.0, 22.0, 3.9, 0.0, "midnight", "#9cafff",
+            "Un cadran sombre à douze repères se forme derrière le gardien. Après les scores, ses aiguilles guident la capture, dévient le ballon ou cèdent avec le cadran. La préparation est commune aux trois issues.",
+            {"capture": true, "branch_at": 0.58, "success_animation": "midnight_capture", "parry_animation": "midnight_parry", "failure_animation": "midnight_shatter", "preview": "midnight"}),
         _definition("wide_wings", "Ailes ouvertes", "TAC", 0.0, 12.0, 60.0, 0.0, "wide", "#87c7ff",
             "Les soutiens s'écartent pour créer deux couloirs de passe. Une pression mesurée conserve l'équilibre collectif.",
             {"width_factor": 1.35, "pressure": 0.35}),
@@ -453,6 +493,18 @@ func _defaults() -> Array[Dictionary]:
             "pg_max": 300.0, "pe_max": 100.0, "pe_drain": 1.0, "sprint_pe_drain": 1.0, "duel_pg_cost": 10.0, "duel_pe_cost": 4.0, "defeat_pg_cost": 20.0,
             "signature_id": "abyssal_cathedral", "owner_keys": ["maelle_neris"], "stat_bonuses": {"keeper": 18.0, "defense": 10.0},
             "appearance": {"style": "thalassa", "height": 4.0, "primary": "#165064", "accent": "#5fe3df", "sound": "Grondement sous-marin, turbines et tintements de verre.", "motif": "Ailes de raie, armure d'eau et boucliers transparents."}}),
+        _definition("vaelis", "Vaélis, le Renard aux neuf éclats", "KARMA", 0.0, 0.0, 600.0, 0.0, "karma", "#f5cd7c",
+            "Un renard humanoïde au masque blanc, armure indigo et neuf queues translucides aux pointes dorées. Souple et imprévisible, il accompagne les changements d'appui du porteur.",
+            {"max_active_per_team": MAX_ACTIVE_PER_TEAM, "energy_max": 95.0, "energy_drain": 0.9, "technique_energy_cost": 0.0,
+            "pg_max": 210.0, "pe_max": 95.0, "pe_drain": 0.9, "sprint_pe_drain": 1.0, "duel_pg_cost": 9.0, "duel_pe_cost": 4.0, "defeat_pg_cost": 18.0,
+            "signature_id": "ninefold_hunt", "owner_keys": ["azur_08"], "stat_bonuses": {"dribble": 16.0, "technique": 12.0},
+            "appearance": {"style": "vaelis", "height": 3.8, "primary": "#272653", "accent": "#f5cd7c", "sound": "Neuf tintements cristallins et un souffle de soie.", "motif": "Masque blanc de renard, armure indigo et neuf queues à pointes dorées."}}),
+        _definition("orvann", "Orvann, le Cerf des remparts", "KARMA", 0.0, 0.0, 600.0, 0.0, "karma", "#92d69d",
+            "Un cerf cuirassé de pierre blanche et de cuivre, aux bois géométriques et épaules de forteresse. Une lumière verte circule dans ses gravures ; ses gestes sont lourds et protecteurs.",
+            {"max_active_per_team": MAX_ACTIVE_PER_TEAM, "energy_max": 80.0, "energy_drain": 0.8, "technique_energy_cost": 0.0,
+            "pg_max": 260.0, "pe_max": 80.0, "pe_drain": 0.8, "sprint_pe_drain": 1.0, "duel_pg_cost": 10.0, "duel_pe_cost": 4.0, "defeat_pg_cost": 20.0,
+            "signature_id": "antler_citadel", "owner_keys": ["azur_04"], "stat_bonuses": {"defense": 18.0, "technique": 8.0},
+            "appearance": {"style": "orvann", "height": 4.2, "primary": "#e3ddc8", "accent": "#92d69d", "sound": "Branches de cuivre, pierres qui s'assemblent et vibration grave.", "motif": "Bois géométriques, armure de pierre blanche, cuivre et gravures vertes."}}),
         _definition("perihelion_hammer", "Marteau du Périhélie", "TIR", 45.0, 0.0, 4.5, 5.0, "perihelion", "#eaa266",
             "Trois anneaux compriment le ballon en un disque incandescent. La frappe du joueur rejoint le marteau d'Astreion et projette un météore dans un tunnel de lumière. Idéal de 10 à 28 mètres ; la puissance diminue ensuite.",
             {"karma_id": "astreion", "pg_cost": 70.0, "pe_cost": 12.0, "preview": "perihelion", "branch_at": 0.58, "flight_arc": 3.0, "spin": 2.4, "optimal_min": 10.0, "optimal_max": 28.0, "distance_falloff": 1.2}),
@@ -460,6 +512,12 @@ func _defaults() -> Array[Dictionary]:
             "Thalassa ferme ses ailes et érige une voûte de colonnes d'eau. Après révélation des scores : la voûte ramène le ballon pour une capture, une colonne le dévie, ou les fissures la font éclater. La préparation reste identique.",
             {"karma_id": "thalassa", "pg_cost": 80.0, "pe_cost": 14.0, "preview": "abyssal", "branch_at": 0.58, "capture": true,
             "success_animation": "abyssal_capture", "parry_animation": "abyssal_parry", "failure_animation": "abyssal_shatter"}),
+        _definition("ninefold_hunt", "Chasse aux neuf reflets", "ATT", 43.0, 0.0, 5.0, 0.0, "ninefold", "#f5cd7c",
+            "Les neuf queues de Vaélis deviennent des silhouettes qui croisent leurs courses autour du défenseur. Après les scores, un seul reflet accompagne le porteur victorieux ; un échec révèle la récupération adverse.",
+            {"karma_id": "vaelis", "pg_cost": 55.0, "pe_cost": 10.0, "dash": 3.1, "preview": "ninefold", "branch_at": 0.58}),
+        _definition("antler_citadel", "Citadelle des ramures", "DEF", 45.0, 0.0, 5.0, 0.0, "citadel", "#92d69d",
+            "Orvann abaisse ses bois et déploie une voûte de remparts entrelacés. Après les scores, une victoire immobilise le ballon au centre ; une défaite fracture la voûte et laisse le tir poursuivre sa route.",
+            {"karma_id": "orvann", "pg_cost": 65.0, "pe_cost": 11.0, "block": true, "pushback": 2.0, "preview": "citadel", "branch_at": 0.58}),
         _definition("sovereign_orbit", "Résonance : Orbite souveraine", "RESONANCE", 0.0, 0.0, 75.0, 0.0, "resonance", "#eaa266",
             "Soren Vale, attaquant stratège, synchronise ses appuis avec le receveur. Mèches cuivrées, yeux ambrés et constellations accompagnent Drift et Tir Magnus. Astreion devient invocable si le donneur le possède.",
             {"max_active_per_team": MAX_ACTIVE_PER_TEAM, "energy_max": 75.0, "energy_drain": 1.0, "technique_energy_cost": 0.0,

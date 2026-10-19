@@ -295,14 +295,9 @@ func choose_duel(choice: String, technique_id: String = "") -> bool:
         "winner_id": attacker.get_id() if won else defender.get_id(), "attacker_won": won,
         "attack_bonus": attack_bonus, "attack_karma_id": attack_karma_id,
         "outcome": outcome, "result": "parry" if outcome == "deflection" else outcome}, true)
-    var cinematic_duration: float = 0.0
-    for id: String in [attack_tech, defense_tech]:
-        if not id.is_empty():
-            cinematic_duration = maxf(cinematic_duration, float(catalog.get_definition(id).get("duration", 3.2)))
-    duel["duration"] = clampf(cinematic_duration if cinematic_duration > 0.0 else 3.2, 1.8, 10.0)
-    if not defense_tech.is_empty() and duel["kind"] == "keeper":
-        var branch: float = float(catalog.get_definition(defense_tech).get("properties", {}).get("branch_at", 0.58))
-        duel["reveal_time"] = clampf(float(duel["duration"]) * branch, 0.7, float(duel["duration"]) - 0.4)
+    var timing: Dictionary = Catalog.cinematic_timing(catalog.get_definition(attack_tech), catalog.get_definition(defense_tech))
+    duel["duration"] = timing["duration"]
+    duel["reveal_time"] = timing["reveal_time"]
     phase = Phase.CINEMATIC
     cinematic_elapsed = 0.0
     return true

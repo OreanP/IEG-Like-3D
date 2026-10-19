@@ -191,9 +191,10 @@ func _prepaid_signature_once() -> bool:
 func _resonance_two_techniques() -> bool:
     var s: IEGMatchSession = fixture()
     var before: int = s.get_available_techniques(8).size()
-    if s.can_use_technique(8, "drift") or not s.activate_modifier(8, "sovereign_orbit"):
+    var original: Array[String] = s.get_player(8).profile.technique_ids.duplicate()
+    if s.can_use_technique(8, "drift") or s.can_use_technique(8, "magnus_shot") or not s.activate_modifier(8, "sovereign_orbit"):
         return false
-    return s.get_available_techniques(8).size() == before + 2 and s.can_use_technique(8, "drift") and s.can_use_technique(8, "magnus_shot") and s.get_player(8).profile.technique_ids.size() == 2
+    return s.get_available_techniques(8).size() == before + 2 and s.can_use_technique(8, "drift") and s.can_use_technique(8, "magnus_shot") and s.get_player(8).profile.technique_ids == original and s.get_player(8).modifiers["RESONANCE"]["techniques"] == ["drift", "magnus_shot"]
 
 func _resonance_exact_base_stats() -> bool:
     var s: IEGMatchSession = fixture()
