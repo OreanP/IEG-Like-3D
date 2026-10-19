@@ -1,6 +1,6 @@
 # Premier passage dans l'entraînement
 
-Commencer par F5 et vérifier l'absence d'erreurs rouges.
+F5 ouvre les Parcours ; choisir **Entraînement**, puis vérifier l'absence d'erreurs rouges. On peut aussi ouvrir `scenes/training_ground.tscn` et lancer F6.
 
 1. Déplacer le personnage lentement au stick puis complètement. À diagonale
    identique, il ne doit pas accélérer davantage qu'en ligne droite.

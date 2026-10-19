@@ -15,7 +15,7 @@ Les anciennes fiches Vigie des vents et Double horizon restent disponibles. Elle
 
 ## Essayer dans le match
 
-1. F5 lance `scenes/full_match.tscn`. Soren reçoit l'engagement.
+1. F5 ouvre les Parcours ; choisir **Match libre**, ou lancer `scenes/full_match.tscn` avec F6. Soren reçoit l'engagement.
 2. **V / L3**, puis **Karma** : invoquer Astreion. Ses PG et PE apparaissent dans deux jauges distinctes ; la signature devient accessible dans les tirs.
 3. Ouvrir **Résonance**, choisir un autre receveur avec les boutons **Joueur ← / →**, puis Orbite souveraine. Le receveur apprend temporairement Drift et Tir Magnus. Le choix d'un receveur ne change ni la sélection live ni la possession.
 4. Sur ce même receveur, ouvrir Karma : Astreion peut être invoqué grâce à Soren. Cela utilise une place de Karma supplémentaire.

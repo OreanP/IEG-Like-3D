@@ -6,7 +6,7 @@ La [refonte visuelle du 16 octobre](VISUAL_UPDATE.md) remplace les modèles affi
 
 ## Lancer et jouer
 
-Godot **standard 4.7 stable**, GDScript uniquement. Ouvrir `project.godot` et F5 lance désormais `scenes/full_match.tscn`. Le terrain d'entraînement reste disponible par le menu ou en lançant `scenes/training_ground.tscn` avec F6.
+Godot **standard 4.7 stable**, GDScript uniquement. F5 ouvre désormais [les Parcours](ROUTES.md) : choisir un adversaire pour un match avec progression, ou **Match libre** pour cette scène de test. `scenes/full_match.tscn` reste lançable directement avec F6. Le terrain d'entraînement reste disponible par le menu ou en lançant `scenes/training_ground.tscn` avec F6.
 
 La scène construit un terrain de **60 × 90 m**, deux équipes de **11 joueurs**, deux buts de 7,32 × 2,44 m, les tribunes et les marquages. Les profils du match sont indépendants de ceux de l'entraînement ; les GLB existants sont conservés. Les camps sont inversés en seconde période, y compris les buts, le placement des gardiens, les déviations et l'attribution des scores.
 
