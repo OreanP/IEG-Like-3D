@@ -6,6 +6,8 @@ signal pause_requested
 signal resume_requested
 signal rematch_requested
 signal training_requested
+signal routes_requested
+signal result_save_requested
 signal editor_requested
 signal duel_choice_requested(choice: String, technique_id: String)
 signal second_half_requested(formations: Dictionary)
@@ -25,6 +27,8 @@ const CORAL := Color("e58d86")
 const NAVY := Color("101e31")
 var _root: Control
 var _score: Label
+var _score_teams: Array[Label] = []
+var _opponent_crest: TextureRect
 var _clock: Label
 var _phase_label: Label
 var _player: Label
@@ -74,6 +78,9 @@ var _score_panel: Control
 var _keeper_panel: Control
 var _last_player_height: float = 0.0
 var _radar: Control
+var routes_available: bool = false
+var is_route_match: bool = false
+var _route_result: Dictionary = {}
 
 func _ready() -> void:
     layer = 10
@@ -98,11 +105,20 @@ func _ready() -> void:
     score_line.add_theme_constant_override("separation", 10)
     scores.add_child(score_line)
     _crest(score_line, "res://assets/ui/azur_crest.svg", 29)
-    _score = _text(score_line, "AZUR   0 — 0   CARMIN", 26, INK)
+    var home_name: Label = _text(score_line, "AZUR", 14, INK)
+    home_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    home_name.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+    home_name.clip_text = true
+    _score = _text(score_line, "0 — 0", 26, INK)
     _score.add_theme_font_override("font", VisualTheme.display_font())
-    _score.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     _score.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    _crest(score_line, "res://assets/ui/carmin_crest.svg", 29)
+    var away_name: Label = _text(score_line, "CARMIN", 14, INK)
+    away_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    away_name.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+    away_name.clip_text = true
+    away_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+    _score_teams = [home_name, away_name]
+    _opponent_crest = _crest(score_line, "res://assets/ui/carmin_crest.svg", 29)
 
     var keepers: VBoxContainer = _panel(Vector2.ZERO, Rect2(24, 112, 414, 64))
     _keeper_panel = keepers.get_parent()
@@ -279,9 +295,9 @@ func _layout() -> void:
     _player_panel.offset_bottom = -22
     _last_player_height = player_height
 
-func _crest(parent: Node, path: String, side: float) -> void:
+func _crest(parent: Node, path: String, side: float) -> TextureRect:
     if not ResourceLoader.exists(path):
-        return
+        return null
     var crest := TextureRect.new()
     crest.texture = load(path)
     crest.custom_minimum_size = Vector2(side, side)
@@ -289,6 +305,11 @@ func _crest(parent: Node, path: String, side: float) -> void:
     crest.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
     crest.mouse_filter = Control.MOUSE_FILTER_IGNORE
     parent.add_child(crest)
+    return crest
+
+func set_opponent_emblem(path: String) -> void:
+    if ResourceLoader.exists(path):
+        _opponent_crest.texture = load(path)
 
 func set_catalogue(definitions: Array) -> void:
     _definitions = definitions
@@ -312,7 +333,10 @@ func refresh(delta: float, session, controls: IEGLocalPlayerInput, paused: bool)
     var player: IEGPlayerState = session.controlled()
     if is_instance_valid(_radar):
         _radar.call("update_match", session)
-    _score.text = "%s   %d — %d   %s" % [session.team_names[0].to_upper(), session.team_goals[0], session.team_goals[1], session.team_names[1].to_upper()]
+    _score.text = "%d — %d" % [session.team_goals[0], session.team_goals[1]]
+    for team: int in [0, 1]:
+        _score_teams[team].text = session.team_names[team].to_upper()
+        _score_teams[team].tooltip_text = session.team_names[team]
     var remaining: int = maxi(0, ceili(session.half_duration - session.elapsed_half))
     var frozen: bool = session.phase != session.Phase.LIVE
     _clock.text = "%s · %02d:%02d%s" % ["1re" if session.period == 1 else "2e", remaining / 60, remaining % 60, "  II" if frozen or paused else ""]
@@ -404,6 +428,8 @@ func _show_pause() -> void:
     _button(_column, "Karma / Resonance", func(): open_actions("KARMA"))
     _button(_column, "Ouvrir l'atelier des techniques", func(): editor_requested.emit())
     _button(_column, "Retour au terrain d'entraînement", func(): training_requested.emit())
+    if routes_available:
+        _button(_column, "Abandonner et revenir aux parcours" if is_route_match else "Revenir aux parcours", func(): routes_requested.emit())
     first.grab_focus()
 
 func _show_duel() -> void:
@@ -503,10 +529,15 @@ func _update_cinematic() -> void:
 
 func _show_halftime() -> void:
     _reset_overlay("halftime", "MI-TEMPS", "Les équipes changent de camp. Ajustez leur disposition avant de reprendre.")
-    _text(_column, "Azur", 21, AQUA)
+    var home: Label = _text(_column, _session.team_names[0], 21, AQUA)
+    home.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     _formation_blue = _formation_selector()
-    _text(_column, "Carmin", 21, Color("ff9d9a"))
+    var away: Label = _text(_column, _session.team_names[1], 21, Color("ff9d9a"))
+    away.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     _formation_red = _formation_selector()
+    var ids: Array[String] = ["balanced", "wide", "press"]
+    _formation_blue.select(maxi(0, ids.find(_session.formations[0])))
+    _formation_red.select(maxi(0, ids.find(_session.formations[1])))
     _text(_column, "Équilibrée : 4-4-2 · Large : ailes écartées · Pressing : bloc plus haut", 16, MUTED)
     var resume: Button = _button(_column, "Commencer la deuxième mi-temps", _resume_second_half)
     _button(_column, "Atelier des techniques", func(): editor_requested.emit())
@@ -531,12 +562,46 @@ func _show_finished() -> void:
     if _session.winner_team >= 0:
         outcome = "Victoire de " + _session.team_names[_session.winner_team]
     _reset_overlay("finished", "FIN DU MATCH", outcome)
-    var result: Label = _text(_column, "%s  %d — %d  %s" % [_session.team_names[0], _session.team_goals[0], _session.team_goals[1], _session.team_names[1]], 42, INK)
+    var result: Label = _text(_column, "%s  %d — %d  %s" % [_session.team_names[0], _session.team_goals[0], _session.team_goals[1], _session.team_names[1]], 32, INK)
+    result.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     result.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    if is_route_match:
+        _show_route_result()
     var first: Button = _button(_column, "Rejouer un match", func(): rematch_requested.emit())
+    if routes_available:
+        _button(_column, "Retour au parcours", func(): routes_requested.emit())
     _button(_column, "Consulter et éditer les techniques", func(): editor_requested.emit())
     _button(_column, "Retour à l'entraînement", func(): training_requested.emit())
     first.grab_focus()
+
+func set_route_result(result: Dictionary) -> void:
+    _route_result = result.duplicate(true)
+    if _mode == "finished":
+        _show_finished()
+
+func _show_route_result() -> void:
+    var error: Variant = _route_result.get("error", "")
+    var failed: bool = (error is String and not error.is_empty()) or (error is int and error != OK) or int(_route_result.get("save_error", OK)) != OK
+    if failed:
+        var warning: Label = _text(_column, "Progression non enregistrée : " + str(_route_result.get("error_message", error)) + "\nRéessayez avant de quitter pour conserver le résultat.", 15, CORAL)
+        warning.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        _button(_column, "Réessayer la sauvegarde", func(): result_save_requested.emit())
+        return
+    var rank: String = String(_route_result.get("rank", ""))
+    var best: String = String(_route_result.get("best_rank", ""))
+    var description: String = "Rang obtenu : " + rank if not rank.is_empty() else "Aucun rang : une victoire est nécessaire."
+    if not best.is_empty():
+        description += "  ·  Meilleur rang : " + best
+    description += "\nProgression enregistrée."
+    var label: Label = _text(_column, description, 17, GOLD)
+    label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    var rewards: Array = _route_result.get("rewards", [])
+    if not rewards.is_empty():
+        var reward_lines: PackedStringArray = []
+        for reward: Dictionary in rewards:
+            reward_lines.append("%s ×%s" % [reward.get("name", reward.get("id", reward.get("type", "Récompense"))), reward.get("amount", 1)])
+        var reward_label: Label = _text(_column, "Gains : " + ", ".join(reward_lines), 14, AQUA)
+        reward_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
 func open_actions(category: String = "TIR", player_id: int = -1) -> void:
     if _session == null or _session.phase != _session.Phase.LIVE:

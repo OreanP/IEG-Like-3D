@@ -44,6 +44,11 @@ var _editor_previous_focus: Control
 var _original_scale_size: Vector2i
 var _editor_previous_disable_3d: bool = false
 var _editor_owns_3d_disable: bool = false
+var _route_run: Node
+var _route_context: Dictionary = {}
+var _route_result: Dictionary = {}
+var _route_result_recorded: bool = false
+var _route_exit_dialog: ConfirmationDialog
 
 func _ready() -> void:
     process_mode = Node.PROCESS_MODE_ALWAYS
@@ -60,8 +65,18 @@ func _ready() -> void:
     camera_rig.distance = 20.0
     camera_rig.home_pitch = 0.62
     camera_rig.camera.fov = 56.0
-    var roster: Dictionary = Roster.build()
+    _route_run = get_node_or_null("/root/RouteRun")
+    if _route_run != null:
+        _route_context = _route_run.take_match_context()
+    var roster: Dictionary = Roster.build() if _route_context.is_empty() else _route_run.catalog.build_roster(String(_route_context["team_id"]))
+    if not _route_context.is_empty():
+        half_seconds = float(roster.get("half_seconds", 300.0))
     session = Session.new(roster.profiles, roster.starts, roster.teams, roster.keepers, half_seconds)
+    if not _route_context.is_empty():
+        var team: Dictionary = _route_run.catalog.team(String(_route_context["team_id"]))
+        session.configure_team(1, String(team["name"]), String(team.get("formation", "balanced")), team.get("ai", {}))
+        hud.set_opponent_emblem(String(team.get("emblem", "")))
+        _route_run.bind_match(session, _route_context)
     _catalogue = session.catalog
     for state: IEGPlayerState in session.players:
         var view: IEGPlayerView = PlayerScene.instantiate()
@@ -94,6 +109,10 @@ func _ready() -> void:
     hud.resume_requested.connect(func(): _set_paused(false))
     hud.menu_opened.connect(_pause_for_menu)
     hud.rematch_requested.connect(_rematch)
+    hud.routes_available = _route_run != null
+    hud.is_route_match = not _route_context.is_empty()
+    hud.routes_requested.connect(_request_routes)
+    hud.result_save_requested.connect(_save_route_result)
     hud.training_requested.connect(_open_training)
     hud.editor_requested.connect(_open_editor)
     hud.duel_choice_requested.connect(_choose_duel)
@@ -213,6 +232,8 @@ func _sync_phase() -> void:
         _cinematic.begin(session.duel, actor, target, ball_view)
     elif session.phase == session.Phase.HALFTIME:
         hud.show_message("Mi-temps · choisissez la disposition des deux équipes.", 5)
+    elif session.phase == session.Phase.FINISHED and not _route_context.is_empty() and not _route_result_recorded:
+        _save_route_result()
     elif session.phase == session.Phase.LIVE and previous >= 0:
         _sync_views(Rules.TICK)
     if session.phase != session.Phase.LIVE:
@@ -375,7 +396,31 @@ func _release_modifier(category: String, player_id: int) -> void:
 
 func _rematch() -> void:
     _paused = false
-    get_tree().reload_current_scene()
+    if not _route_context.is_empty() and _route_run != null:
+        _route_run.launch_match(String(_route_context["route_id"]), String(_route_context["node_id"]))
+    else:
+        get_tree().reload_current_scene()
+
+func _save_route_result() -> void:
+    if _route_run == null or _route_context.is_empty() or session.phase != session.Phase.FINISHED:
+        return
+    _route_result = _route_run.complete_match(session, _route_context)
+    _route_result_recorded = true
+    hud.set_route_result(_route_result)
+
+func _request_routes() -> void:
+    if _route_run == null:
+        return
+    if session.phase == session.Phase.FINISHED:
+        _route_run.open_board()
+        return
+    if _route_exit_dialog == null:
+        _route_exit_dialog = ConfirmationDialog.new()
+        _route_exit_dialog.title = "Abandonner cette rencontre ?"
+        _route_exit_dialog.dialog_text = "La rencontre en cours ne donnera ni rang ni récompense. Votre progression déjà sauvegardée est conservée."
+        _route_exit_dialog.confirmed.connect(func(): _route_run.open_board())
+        add_child(_route_exit_dialog)
+    _route_exit_dialog.popup_centered(Vector2i(540, 180))
 
 func _open_editor() -> void:
     if is_instance_valid(_editor_layer) or session.phase == session.Phase.CINEMATIC:
@@ -427,7 +472,10 @@ func _close_editor() -> void:
     _sync_views(0.0)
 
 func _open_training() -> void:
-    get_tree().change_scene_to_file("res://scenes/training_ground.tscn")
+    if _route_run != null:
+        _route_run.launch_training()
+    else:
+        get_tree().change_scene_to_file("res://scenes/training_ground.tscn")
 
 func _present(event: Dictionary) -> void:
     var kind: int = int(event.get("kind", -1))

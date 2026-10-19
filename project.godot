@@ -15,9 +15,13 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 [application]
 
 config/name="IEG Like Godot — Match"
-run/main_scene="res://scenes/full_match.tscn"
+run/main_scene="res://scenes/routes.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
+
+[autoload]
+
+RouteRun="*res://scripts/routes/route_run.gd"
 
 [display]
 

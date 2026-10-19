@@ -34,6 +34,8 @@ run_checked scene-input --script res://tests/development/scene_smoke.gd
 run_checked training res://scenes/training_ground.tscn --quit-after 180
 run_checked match-input --script res://tests/match/scene_smoke.gd
 run_checked augmentation-input --script res://tests/match/augmentation_scene_smoke.gd
+run_checked route-board res://scenes/routes.tscn --quit-after 120
+run_checked route-loop --script res://tests/routes/scene_smoke.gd
 run_checked full-match res://scenes/full_match.tscn --quit-after 180 -- --smoke
 run_checked content-editor res://scenes/content_editor.tscn --quit-after 120
 run_checked duel-preview res://scenes/duel_preview.tscn -- --verify
