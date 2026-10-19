@@ -3,7 +3,11 @@ extends Control
 
 const VisualTheme = preload("res://scripts/presentation/visual_theme.gd")
 const Connections = preload("res://scripts/routes/route_connections.gd")
-const CARD_SIZE := Vector2(190, 112)
+const RouteTile = preload("res://scripts/routes/route_tile.gd")
+const CARD_SIZE := Vector2(132, 126)
+const ZOOM_MIN: float = 0.8
+const ZOOM_MAX: float = 1.8
+const DEFAULT_ZOOM: float = 1.35
 const RANK_COLORS := {"B": Color("b79d7c"), "A": Color("c8d9e6"), "S": Color("e5af65")}
 const TYPE_NAMES := {"match": "RENCONTRE", "reward": "COFFRE", "gate": "DÉBLOCAGE", "branch": "BIFURCATION"}
 
@@ -19,9 +23,25 @@ var _route_summary: Label
 var _route_description: Label
 var _notice: Label
 var _notice_panel: PanelContainer
-var _map_scroll: ScrollContainer
+var _map_view: Control
+var _map_panel: PanelContainer
 var _map: Control
 var _connections: Control
+var _map_background: Control
+var _camera_center := Vector2.ZERO
+var _target_center := Vector2.ZERO
+var map_zoom: float = DEFAULT_ZOOM
+var _target_zoom: float = DEFAULT_ZOOM
+var _camera_initialized: bool = false
+var _camera_tween: Tween
+var _dragging: bool = false
+var _zoom_in: Button
+var _zoom_out: Button
+var _center_button: Button
+var _zoom_label: Label
+var _detail_toggle: Button
+var _detail_panel: PanelContainer
+var _detail_expanded: bool = false
 var _detail_scroll: ScrollContainer
 var _detail: VBoxContainer
 var _detail_actions: VBoxContainer
@@ -76,9 +96,114 @@ func _exit_tree() -> void:
         window.content_scale_size = _original_scale_size
 
 func _unhandled_input(event: InputEvent) -> void:
-    if event.is_action_pressed("ui_cancel") and _buttons.has(selected_node_id):
+    if event.is_action_pressed("recenter"):
+        center_selected()
+        get_viewport().set_input_as_handled()
+
+    elif ((event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_Y)
+            or (event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_I)):
+        _toggle_details()
+        get_viewport().set_input_as_handled()
+    elif event.is_action_pressed("ui_cancel") and _buttons.has(selected_node_id):
+        if _detail_expanded:
+            _toggle_details()
         _buttons[selected_node_id].grab_focus()
         get_viewport().set_input_as_handled()
+
+func _input(event: InputEvent) -> void:
+    # Le relâchement peut arriver hors de la carte pendant une exploration.
+    if event is InputEventMouseButton and not event.pressed and event.button_index in [MOUSE_BUTTON_MIDDLE, MOUSE_BUTTON_RIGHT]:
+        _dragging = false
+
+func _process(delta: float) -> void:
+    var devices: Array[int] = Input.get_connected_joypads()
+    if not devices.is_empty():
+        var device: int = devices[0]
+        var pan := Vector2(Input.get_joy_axis(device, JOY_AXIS_RIGHT_X), Input.get_joy_axis(device, JOY_AXIS_RIGHT_Y))
+        if _detail_expanded:
+            if absf(pan.y) > 0.22:
+                _detail_scroll.scroll_vertical += roundi(pan.y * 360.0 * delta)
+            return
+        if pan.length() > 0.22:
+            _stop_camera_tween()
+            _camera_center += pan * 360.0 * delta / map_zoom
+            _target_center = _camera_center
+        var zoom_input: float = maxf(0, Input.get_joy_axis(device, JOY_AXIS_TRIGGER_RIGHT)) - maxf(0, Input.get_joy_axis(device, JOY_AXIS_TRIGGER_LEFT))
+        if absf(zoom_input) > 0.15:
+            set_map_zoom(map_zoom + zoom_input * delta * 0.65)
+    _apply_camera()
+
+func set_map_zoom(value: float, animate: bool = false) -> void:
+    _target_zoom = clampf(value, ZOOM_MIN, ZOOM_MAX)
+    _stop_camera_tween()
+    if animate:
+        _camera_tween = create_tween().set_parallel(true)
+        _camera_tween.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+        _camera_tween.tween_property(self, "map_zoom", _target_zoom, 0.18)
+        _camera_tween.tween_property(self, "_camera_center", _target_center, 0.18)
+    else:
+        map_zoom = _target_zoom
+        _camera_center = _target_center
+    _apply_camera()
+
+func center_selected(animate: bool = true) -> void:
+    if not _buttons.has(selected_node_id):
+        return
+    var tile: Control = _buttons[selected_node_id]
+    _target_center = tile.position + CARD_SIZE * 0.5
+    _stop_camera_tween()
+    map_zoom = _target_zoom
+    if animate and _camera_initialized:
+        _camera_tween = create_tween()
+        _camera_tween.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+        _camera_tween.tween_property(self, "_camera_center", _target_center, 0.22)
+    else:
+        _camera_center = _target_center
+    _camera_initialized = true
+    _apply_camera()
+
+func _stop_camera_tween() -> void:
+    if _camera_tween != null and _camera_tween.is_valid():
+        _camera_tween.kill()
+
+func _apply_camera() -> void:
+    if _map == null or _map_view == null:
+        return
+    _map.scale = Vector2.ONE * map_zoom
+    _map.position = _map_view.size * 0.5 - _camera_center * map_zoom
+    if _zoom_label != null:
+        _zoom_label.text = "%d %%" % roundi(map_zoom * 100)
+
+func _map_resized() -> void:
+    if _map_background != null:
+        _map_background.size = _map_view.size
+        _map_background.queue_redraw()
+    _apply_camera()
+
+func _map_input(event: InputEvent) -> void:
+    if event is InputEventMouseButton:
+        if event.button_index in [MOUSE_BUTTON_MIDDLE, MOUSE_BUTTON_RIGHT]:
+            _dragging = event.pressed
+            _map_view.accept_event()
+        elif event.pressed and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+            set_map_zoom(_target_zoom + (0.12 if event.button_index == MOUSE_BUTTON_WHEEL_UP else -0.12), true)
+            _map_view.accept_event()
+    elif event is InputEventMouseMotion and _dragging:
+        _stop_camera_tween()
+        _camera_center -= event.relative / map_zoom
+        _target_center = _camera_center
+        _apply_camera()
+        _map_view.accept_event()
+
+func _toggle_details() -> void:
+    _detail_expanded = not _detail_expanded
+    _map_panel.visible = not _detail_expanded
+    _detail_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL if _detail_expanded else Control.SIZE_FILL
+    _detail_panel.custom_minimum_size.y = 0.0 if _detail_expanded else 120.0
+    _detail_toggle.text = "Réduire la fiche · Y" if _detail_expanded else "Fiche complète · Y"
+    _detail_scroll.scroll_vertical = 0
+    _detail_toggle.grab_focus()
+    _map_resized.call_deferred()
 
 func _build_ui() -> void:
     theme = VisualTheme.make_theme()
@@ -90,10 +215,10 @@ func _build_ui() -> void:
     var margin := MarginContainer.new()
     margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     for side: String in ["left", "right", "top", "bottom"]:
-        margin.add_theme_constant_override("margin_" + side, 20)
+        margin.add_theme_constant_override("margin_" + side, 16)
     add_child(margin)
     var layout := VBoxContainer.new()
-    layout.add_theme_constant_override("separation", 12)
+    layout.add_theme_constant_override("separation", 9)
     margin.add_child(layout)
     var header := HBoxContainer.new()
     layout.add_child(header)
@@ -101,22 +226,21 @@ func _build_ui() -> void:
     title_group.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     title_group.add_theme_constant_override("separation", 0)
     header.add_child(title_group)
-    _label(title_group, "IEG  /  LE CLUB PART EN TOURNÉE", 11, VisualTheme.GOLD)
-    var title := _label(title_group, "LES PARCOURS", 32)
+    _label(title_group, "IEG  /  TABLEAUX DE RENCONTRES", 10, VisualTheme.GOLD)
+    var title := _label(title_group, "LES PARCOURS", 27)
     title.add_theme_font_override("font", VisualTheme.display_font())
-    _wallet = _label(header, "", 13, VisualTheme.AQUA)
+    _wallet = _label(header, "", 12, VisualTheme.AQUA)
     _wallet.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-    var free_button := _button(header, "Match libre", _launch_free)
-    free_button.tooltip_text = "Lancer un match sans enjeu de progression."
+    _button(header, "Match libre", _launch_free)
     _button(header, "Entraînement", _launch_training)
     var route_bar := HBoxContainer.new()
     layout.add_child(route_bar)
     _selector = OptionButton.new()
     _selector.name = "RouteSelector"
-    _selector.custom_minimum_size.x = 270
+    _selector.custom_minimum_size.x = 240
     _selector.item_selected.connect(func(index: int) -> void: select_route(String(_selector.get_item_metadata(index))))
     route_bar.add_child(_selector)
-    _route_description = _label(route_bar, "", 13, VisualTheme.MUTED)
+    _route_description = _label(route_bar, "", 12, VisualTheme.MUTED)
     _route_description.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     _route_description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     _route_description.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -125,63 +249,94 @@ func _build_ui() -> void:
     _notice_panel = PanelContainer.new()
     _notice_panel.visible = false
     layout.add_child(_notice_panel)
-    _notice = _label(_notice_panel, "", 13)
+    _notice = _label(_notice_panel, "", 12)
     _notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    var content := HBoxContainer.new()
-    content.size_flags_vertical = Control.SIZE_EXPAND_FILL
-    content.add_theme_constant_override("separation", 16)
-    layout.add_child(content)
     var map_panel := PanelContainer.new()
-    map_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    _map_panel = map_panel
     map_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-    map_panel.add_theme_stylebox_override("panel", VisualTheme.surface(Color("0e1c2d")))
-    content.add_child(map_panel)
+    map_panel.add_theme_stylebox_override("panel", VisualTheme.surface(Color("163747"), Color("438496"), 8))
+    layout.add_child(map_panel)
     var map_layout := VBoxContainer.new()
     map_panel.add_child(map_layout)
     var map_heading := HBoxContainer.new()
     map_layout.add_child(map_heading)
-    _label(map_heading, "CHOISISSEZ VOTRE PROCHAINE RENCONTRE", 11, VisualTheme.GOLD).size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    _label(map_heading, "Faites défiler la carte", 10, VisualTheme.MUTED)
-    _map_scroll = ScrollContainer.new()
-    _map_scroll.name = "RouteMapScroll"
-    _map_scroll.follow_focus = true
-    _map_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    _map_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-    map_layout.add_child(_map_scroll)
+    _label(map_heading, "VOTRE CASE ET SES ENVIRONS", 11, VisualTheme.AQUA).size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    _zoom_out = _button(map_heading, "−", func(): set_map_zoom(_target_zoom - 0.15, true))
+    _zoom_out.name = "ZoomOut"
+    _compact_button(_zoom_out)
+    _zoom_out.tooltip_text = "Dézoomer · LT / L2 · molette"
+    _zoom_label = _label(map_heading, "135 %", 12, VisualTheme.INK)
+    _zoom_label.custom_minimum_size.x = 52
+    _zoom_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    _zoom_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+    _zoom_in = _button(map_heading, "+", func(): set_map_zoom(_target_zoom + 0.15, true))
+    _zoom_in.name = "ZoomIn"
+    _compact_button(_zoom_in)
+    _zoom_in.tooltip_text = "Zoomer · RT / R2 · molette"
+    _center_button = _button(map_heading, "Recentrer", func(): center_selected())
+    _center_button.name = "CenterSelected"
+    _compact_button(_center_button)
+    _center_button.tooltip_text = "Revenir à la case sélectionnée · R3 / C"
+    _map_view = Control.new()
+    _map_view.name = "RouteMapViewport"
+    _map_view.clip_contents = true
+    _map_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    _map_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    _map_view.custom_minimum_size = Vector2(0, 80)
+    _map_view.gui_input.connect(_map_input)
+    _map_view.resized.connect(_map_resized)
+    map_layout.add_child(_map_view)
+    _map_background = Connections.new()
+    _map_background.name = "HoneycombBackground"
+    _map_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    _map_view.add_child(_map_background)
     _map = Control.new()
-    _map.name = "RouteMap"
-    _map_scroll.add_child(_map)
+    _map.name = "RouteMapWorld"
+    _map.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    _map_view.add_child(_map)
     var map_legend := HBoxContainer.new()
     map_layout.add_child(map_legend)
-    _label(map_legend, "●  Disponible", 11, VisualTheme.AQUA)
-    _label(map_legend, "●  Remporté", 11, VisualTheme.GOLD)
-    _label(map_legend, "●  Verrouillé", 11, VisualTheme.MUTED)
-    var detail_panel := PanelContainer.new()
-    detail_panel.name = "MatchDetail"
-    detail_panel.custom_minimum_size.x = 316
-    detail_panel.size_flags_horizontal = Control.SIZE_FILL
-    detail_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-    content.add_child(detail_panel)
-    var detail_layout := VBoxContainer.new()
-    detail_panel.add_child(detail_layout)
+    _label(map_legend, "● Disponible", 10, VisualTheme.AQUA)
+    _label(map_legend, "● Remporté", 10, VisualTheme.GOLD)
+    _label(map_legend, "● Verrouillé", 10, Color("a6acb3"))
+    var spacer := Control.new()
+    spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    map_legend.add_child(spacer)
+    _label(map_legend, "Stick droit / glisser : explorer", 10, VisualTheme.MUTED)
+    _detail_panel = PanelContainer.new()
+    _detail_panel.name = "MatchDetail"
+    _detail_panel.custom_minimum_size.y = 120
+    layout.add_child(_detail_panel)
+    var detail_layout := HBoxContainer.new()
+    _detail_panel.add_child(detail_layout)
     _detail_scroll = ScrollContainer.new()
     _detail_scroll.name = "DetailScroll"
-    _detail_scroll.custom_minimum_size.x = 288
     _detail_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
     _detail_scroll.follow_focus = true
+    _detail_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     _detail_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
     detail_layout.add_child(_detail_scroll)
     _detail = VBoxContainer.new()
     _detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    _detail.add_theme_constant_override("separation", 12)
+    _detail.add_theme_constant_override("separation", 8)
     _detail_scroll.add_child(_detail)
+    var detail_right := VBoxContainer.new()
+    detail_right.custom_minimum_size.x = 210
+    detail_layout.add_child(detail_right)
     _detail_actions = VBoxContainer.new()
     _detail_actions.name = "DetailActions"
-    detail_layout.add_child(_detail_actions)
+    detail_right.add_child(_detail_actions)
+    _detail_toggle = _button(detail_right, "Fiche complète · Y", _toggle_details)
+    _detail_toggle.name = "DetailsToggle"
+    _compact_button(_detail_toggle)
+    _detail_toggle.tooltip_text = "Agrandir les conditions et récompenses · Y / Triangle / I"
+    var detail_hint := _label(detail_right, "A : action   ·   B : carte", 10, VisualTheme.MUTED)
+    detail_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     var footer := HBoxContainer.new()
     layout.add_child(footer)
-    _label(footer, "Direction / croix : parcourir    ·    A / Entrée : sélectionner", 11, VisualTheme.MUTED).size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    _label(footer, "Chaque rencontre se joue sur le terrain.", 11, VisualTheme.GOLD)
+    _label(footer, "Directions : case   ·   LT / RT : zoom   ·   R3 : recentrer", 10, VisualTheme.MUTED).size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    _label(footer, "Chaque rencontre se joue sur le terrain.", 10, VisualTheme.GOLD)
+    _map_resized.call_deferred()
 
 func select_route(id: String) -> void:
     if _runner == null:
@@ -202,7 +357,13 @@ func select_route(id: String) -> void:
     if _buttons.has(previous):
         select_node(previous)
     elif not nodes.is_empty():
-        select_node(String(nodes[0].get("id", "")))
+        var entry_id: String = String(nodes[0].get("id", ""))
+        for node: Dictionary in nodes:
+            if node.get("type", "") == "match" and _runner.progress.is_unlocked(id, String(node["id"])):
+                entry_id = String(node["id"])
+                if _runner.progress.best_rank(id, entry_id).is_empty():
+                    break
+        select_node(entry_id)
 
 func select_node(id: String) -> void:
     if _runner == null or not _buttons.has(id):
@@ -210,26 +371,34 @@ func select_node(id: String) -> void:
     var node: Dictionary = _runner.catalog.node(route_id, id)
     if node.is_empty():
         return
+    if id == selected_node_id and _detail_title != null:
+        center_selected()
+        return
     selected_node_id = id
+    _runner.selected_route = route_id
+    _runner.selected_node = id
     _build_detail(node)
     for key: String in _buttons:
         _style_node(_buttons[key], _runner.catalog.node(route_id, key), key == id)
     _connections.selected_id = id
     _connections.queue_redraw()
     _wire_focus()
+    center_selected()
 
 func _rebuild_map() -> void:
     for child: Node in _map.get_children():
         _map.remove_child(child)
         child.queue_free()
     _buttons.clear()
+    _detail_title = null
     _connections = Connections.new()
     _connections.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    _connections.draw_background = false
     _connections.nodes = _route.get("nodes", [])
     _connections.edges = _route.get("edges", [])
     _connections.card_size = CARD_SIZE
     _map.add_child(_connections)
-    var bounds := Vector2(550, 370)
+    var bounds := CARD_SIZE
     var won: int = 0
     var matches: int = 0
     for node: Dictionary in _route.get("nodes", []):
@@ -238,98 +407,39 @@ func _rebuild_map() -> void:
         var rank: String = _runner.progress.best_rank(route_id, id)
         _connections.available[id] = unlocked
         var step_type: String = String(node.get("type", "match"))
-        _connections.cleared[id] = not rank.is_empty() or _is_claimed(id) or (unlocked and step_type in ["gate", "branch"])
-        if String(node.get("type", "match")) == "match":
+        var claimed: bool = _is_claimed(id)
+        _connections.cleared[id] = not rank.is_empty() or claimed or (unlocked and step_type in ["gate", "branch"])
+        if step_type == "match":
             matches += 1
             if not rank.is_empty():
                 won += 1
         var raw: Array = node.get("position", [40, 40])
         var position_value := Vector2(float(raw[0]), float(raw[1]))
-        bounds = bounds.max(position_value + CARD_SIZE + Vector2(40, 40))
-        var button := Button.new()
-        button.name = "Node_" + id.validate_node_name()
-        button.position = position_value
-        button.size = CARD_SIZE
-        button.custom_minimum_size = CARD_SIZE
-        button.clip_contents = true
-        button.tooltip_text = String(node.get("name", id)) + (" · Disponible" if unlocked else " · Conditions à remplir")
-        button.pressed.connect(func() -> void: _activate_node(id))
-        button.focus_entered.connect(func() -> void: select_node(id))
-        _map.add_child(button)
-        _buttons[id] = button
-        _node_content(button, node, unlocked, rank)
-        _style_node(button, node, false)
-    _map.custom_minimum_size = bounds
+        bounds = bounds.max(position_value + CARD_SIZE)
+        var tile: Button = RouteTile.new()
+        tile.name = "Node_" + id.validate_node_name()
+        tile.position = position_value
+        tile.size = CARD_SIZE
+        tile.custom_minimum_size = CARD_SIZE
+        var team: Dictionary = _runner.catalog.team(String(node.get("team_id", ""))) if step_type == "match" else {}
+        tile.configure(node, team, unlocked, rank, claimed)
+        # Le nom et les accès figurent dans la fiche. Une infobulle attachée
+        # à la case resterait sous le pointeur pendant le déplacement de caméra.
+        tile.tooltip_text = ""
+        tile.pressed.connect(func() -> void: _activate_node(id))
+        tile.focus_entered.connect(func() -> void: select_node(id))
+        tile.gui_input.connect(_map_input)
+        _map.add_child(tile)
+        _buttons[id] = tile
+    _map.size = bounds
     _connections.size = bounds
     _connections.queue_redraw()
     _route_summary.text = "%d / %d remportés" % [won, matches]
     _wire_focus()
+    _apply_camera()
 
-func _node_content(button: Button, node: Dictionary, unlocked: bool, rank: String) -> void:
-    var box := VBoxContainer.new()
-    box.position = Vector2(12, 9)
-    box.size = CARD_SIZE - Vector2(24, 18)
-    box.add_theme_constant_override("separation", 4)
-    _ignore_mouse(box)
-    button.add_child(box)
-    var identity := HBoxContainer.new()
-    identity.add_theme_constant_override("separation", 7)
-    box.add_child(identity)
-    var type: String = String(node.get("type", "match"))
-    var team: Dictionary = _runner.catalog.team(String(node.get("team_id", ""))) if type == "match" else {}
-    if type == "match":
-        _emblem(identity, team, 32)
-    var top := VBoxContainer.new()
-    top.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    top.add_theme_constant_override("separation", 0)
-    identity.add_child(top)
-    _label(top, String(TYPE_NAMES.get(type, "ÉTAPE")), 9, VisualTheme.GOLD if unlocked else VisualTheme.MUTED)
-    var name_label := _label(top, String(team.get("name", node.get("name", "Rencontre"))), 13)
-    name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-    name_label.clip_text = true
-    var status := HBoxContainer.new()
-    box.add_child(status)
-    var level: String = "Niv. conseillé  %d" % int(node.get("recommended_level", team.get("level", 1))) if type == "match" else String(node.get("name", "Étape"))
-    var level_label := _label(status, level, 10, VisualTheme.MUTED)
-    level_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    level_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-    level_label.clip_text = true
-    if not rank.is_empty():
-        _label(status, rank, 17, RANK_COLORS.get(rank, VisualTheme.GOLD))
-    var caption: String = "DISPONIBLE" if unlocked else "VERROUILLÉ"
-    var caption_color: Color = VisualTheme.AQUA if unlocked else VisualTheme.MUTED
-    if not rank.is_empty():
-        caption = "REJOUER LIBREMENT"
-        caption_color = VisualTheme.GOLD
-    elif type == "reward" and _is_claimed(String(node.get("id", ""))):
-        caption = "RÉCUPÉRÉ"
-        caption_color = VisualTheme.GOLD
-    _label(box, caption, 9, caption_color)
-    var rewards: Dictionary = node.get("rewards", {})
-    var candidates: Array = rewards.get("first_win", []) if type == "match" else rewards.get("claim", [])
-    if candidates.is_empty():
-        candidates = rewards.get("repeat", [])
-    if not candidates.is_empty():
-        var potential := _label(box, _reward_text(candidates[0], false), 9, VisualTheme.MUTED)
-        potential.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-        potential.clip_text = true
-    _ignore_mouse(box)
-
-func _style_node(button: Button, node: Dictionary, selected: bool) -> void:
-    var id: String = String(node.get("id", ""))
-    var unlocked: bool = _runner.progress.is_unlocked(route_id, id)
-    var rank: String = _runner.progress.best_rank(route_id, id)
-    var border: Color = VisualTheme.AQUA if unlocked else Color("34475a")
-    if not rank.is_empty() or _is_claimed(id):
-        border = VisualTheme.GOLD
-    var background := Color("152c3d") if unlocked else Color("152132")
-    if selected:
-        border = VisualTheme.GOLD
-        background = Color("253b4a")
-    var style := VisualTheme.surface(background, border)
-    style.set_border_width_all(2 if selected else 1)
-    button.add_theme_stylebox_override("normal", style)
-    button.add_theme_stylebox_override("hover", VisualTheme.surface(background.lightened(0.08), border))
+func _style_node(button: Button, _node: Dictionary, selected: bool) -> void:
+    button.set_selected(selected)
 
 func _build_detail(node: Dictionary) -> void:
     for child: Node in _detail.get_children():
@@ -358,7 +468,7 @@ func _build_detail(node: Dictionary) -> void:
         _wrapped(_detail, description, VisualTheme.MUTED)
     if type == "match":
         var formation: String = String(team.get("formation", ""))
-        formation = String({"balanced": "Disposition équilibrée", "wide": "Jeu sur les ailes", "compact": "Bloc compact", "offensive": "Disposition offensive", "defensive": "Disposition défensive"}.get(formation, formation))
+        formation = String({"balanced": "Disposition équilibrée", "wide": "Jeu sur les ailes", "press": "Bloc en pressing"}.get(formation, formation))
         _wrapped(_detail, "Niveau conseillé  %d%s" % [int(node.get("recommended_level", team.get("level", 1))), "   ·   " + formation if not formation.is_empty() else ""], VisualTheme.AQUA)
         var rank: String = _runner.progress.best_rank(route_id, id)
         if rank.is_empty():
@@ -386,9 +496,12 @@ func _build_detail(node: Dictionary) -> void:
         _wrapped(_detail, "Victoire, nul ou défaite : le résultat vient du match. Seule une victoire attribue un rang.", VisualTheme.MUTED, 11)
     elif type == "reward":
         var claimed: bool = _is_claimed(id)
-        _detail_action = _button(_detail_actions, "Récompense récupérée" if claimed else "Réclamer la récompense", _claim_selected)
+        var pending: bool = bool(node.get("rewards_pending", false))
+        if pending:
+            _wrapped(_detail, "Contenu du coffre à définir. Il restera disponible lorsque ses récompenses seront configurées.", VisualTheme.GOLD)
+        _detail_action = _button(_detail_actions, "Contenu à définir" if pending else ("Récompense récupérée" if claimed else "Ouvrir le coffre"), _claim_selected)
         _detail_action.name = "ClaimReward"
-        _detail_action.disabled = not unlocked or claimed
+        _detail_action.disabled = not unlocked or claimed or pending
         _detail_action.custom_minimum_size.y = 45
     else:
         _wrapped(_detail, "Cette étape relie les rencontres suivantes. Les conditions se valident avec votre progression.", VisualTheme.MUTED, 12)
@@ -612,6 +725,13 @@ func _button(parent: Node, text: String, callback: Callable) -> Button:
     button.pressed.connect(callback)
     parent.add_child(button)
     return button
+
+func _compact_button(button: Button) -> void:
+    for state: String in ["normal", "hover", "pressed", "disabled"]:
+        var style := VisualTheme.surface(Color("1b3047") if state == "normal" else Color("263e55"))
+        style.content_margin_top = 3
+        style.content_margin_bottom = 3
+        button.add_theme_stylebox_override(state, style)
 
 func _label(parent: Node, text: String, font_size: int = 14, color: Color = VisualTheme.INK) -> Label:
     var label := Label.new()
