@@ -33,3 +33,23 @@ Materials use standard PBR features compatible with the OpenGL renderer.
 
 This is an improved shared player model, with profile-dependent colors. It does
 not add a facial animation rig or unique head/hair meshes for each squad member.
+
+## Karma models
+
+The original Astreion and Thalassa models are authored by `build_spirits.py`.
+Vaélis and Orvann are authored separately so rebuilding them preserves the
+existing assets:
+
+```sh
+blender --background --python tools/art/build_new_spirits.py
+```
+
+This command reuses the original art primitives without running their exports.
+It writes `assets/karma/vaelis.glb` and `assets/karma/orvann.glb`; Godot imports
+their standard materials and articulated regions. Vaélis has 27,660 triangles
+and sixteen mesh parts, including nine independently animated tails. Orvann has
+23,672 triangles and nine mesh parts, including separate antler pivots. Their
+runtime poses are deterministic GDScript in `modifier_visual.gd`.
+
+See [the model notes](../../assets/karma/README.md) for palettes and pivots.
+Blender and Python remain offline authoring tools, never runtime dependencies.
